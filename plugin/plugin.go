@@ -3,6 +3,7 @@ package plugin
 import (
 	"fmt"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
 )
 
@@ -17,6 +18,7 @@ type Metadata struct {
 	PassiveTriggers []Command
 	// Only trigger this plugin if the bot is mentionned
 	WhenMentionned bool
+	Logger         *logrus.Entry
 }
 
 // Command is a Command implemented by a plugin
@@ -46,5 +48,5 @@ type SlackResponse struct {
 type Plugin interface {
 	Init()
 	GetMetadata() *Metadata
-	ProcessMessage(command []string, message *slack.Msg) (response *SlackResponse, err error)
+	ProcessMessage(command []string, message slack.Msg) (response *SlackResponse, err error)
 }

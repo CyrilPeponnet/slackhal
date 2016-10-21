@@ -1,6 +1,9 @@
 package builtins
 
 import (
+	"fmt"
+	"regexp"
+
 	"github.com/nlopes/slack"
 	"github.com/slackhal/plugin"
 )
@@ -8,6 +11,18 @@ import (
 // help struct define your plugin
 type help struct {
 	plugin.Metadata
+}
+
+// init function that will register your plugin to the plugin manager
+func init() {
+	helper := new(help)
+	helper.Metadata = plugin.NewMetadata("help")
+	helper.Metadata.Description = "Helper plugin."
+	helper.ActiveTriggers = []plugin.Command{plugin.Command{Name: "help", ShortDescription: "Will provide some help :)"},
+		plugin.Command{Name: "list-plugins", ShortDescription: "List all enabled plugins"},
+		plugin.Command{Name: "list-commands", ShortDescription: "List all available commands"},
+		plugin.Command{Name: "list-triggers", ShortDescription: "List all passive triggers"}}
+	plugin.PluginManager.Register(helper)
 }
 
 // Init interface implementation if you need to init things
@@ -22,20 +37,107 @@ func (h *help) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *help) ProcessMessage(cmds []string, m *slack.Msg) (o *plugin.SlackResponse, e error) {
+func (h *help) ProcessMessage(cmds []string, m slack.Msg) (o *plugin.SlackResponse, e error) {
+	helpPluginPattern := regexp.MustCompile(`(help)\s*(\S*)\s*(\S*)`)
+	o = new(plugin.SlackResponse)
+	h.Logger.Warn(cmds)
 	for _, c := range cmds {
-		if c == "help" {
-			o = new(plugin.SlackResponse)
-			o.Text = "zob"
+		switch {
+		case helpPluginPattern.MatchString(m.Text):
+			p := helpPluginPattern.FindStringSubmatch(m.Text)
+			o.Text = GetHelpForPlugin(p)
+		case c == "list-plugins":
+			o.Text = PluginList()
+		case c == "list-commands":
+			o.Text = PluginListActions()
+		case c == "list-triggers":
+			o.Text = PluginListTriggers()
 		}
+	}
+	o.ChannelID = m.User
+	return
+}
+
+// PluginListTriggers list plugins actions
+func PluginListTriggers() (o string) {
+	l := ""
+	for _, p := range plugin.PluginManager.Plugins {
+		info := p.GetMetadata()
+		a := ""
+		for _, c := range info.PassiveTriggers {
+			a += fmt.Sprintf(">_%v_  - %v\n", c.Name, c.ShortDescription)
+		}
+		if a != "" {
+			l += fmt.Sprintf("\n*%v* (%v) - %v\n", info.Name, info.Version, info.Description)
+			l += a
+		}
+	}
+	if l != "" {
+		o = "Here are all the passive triggers enabled:\n"
+		o += l
+	} else {
+		o = "Cannot find any passive triggers."
 	}
 	return
 }
 
-// init function that will register your plugin to the plugin manager
-func init() {
-	helper := new(help)
-	helper.Metadata = plugin.NewMetadata("help")
-	helper.ActiveTriggers = []plugin.Command{plugin.Command{Name: "help"}}
-	plugin.PluginManager.Register(helper)
+// PluginListActions list plugins actions
+func PluginListActions() (o string) {
+	l := ""
+	for _, p := range plugin.PluginManager.Plugins {
+		info := p.GetMetadata()
+		a := ""
+		for _, c := range info.ActiveTriggers {
+			a += fmt.Sprintf(">_%v_  - %v\n", c.Name, c.ShortDescription)
+		}
+		if a != "" {
+			l += fmt.Sprintf("\n*%v* (%v) - %v\n", info.Name, info.Version, info.Description)
+			l += a
+		}
+	}
+	if l != "" {
+		o = "Here are all the commands availables:\n"
+		o += l
+	} else {
+		o = "Cannot find any plugin actions."
+	}
+	return
+}
+
+// PluginList list plugins
+func PluginList() (o string) {
+	o = "Here is my plugin list:\n"
+	for _, p := range plugin.PluginManager.Plugins {
+		info := p.GetMetadata()
+		o += fmt.Sprintf(">*%v* (%v) - %v\n", info.Name, info.Version, info.Description)
+	}
+	return
+}
+
+// GetHelpForPlugin get help for a give plugin and commands
+func GetHelpForPlugin(matches []string) (o string) {
+	if matches[3] != "" || matches[2] != "" {
+		for _, p := range plugin.PluginManager.Plugins {
+			info := p.GetMetadata()
+			if info.Name == matches[2] {
+				o = fmt.Sprintf("*%v* (%v) - %v\n", info.Name, info.Version, info.Description)
+				for _, c := range info.ActiveTriggers {
+					if c.Name == matches[3] {
+						o += fmt.Sprintf("> *%v*:\n```%v```\n", c.Name, c.LongDescription)
+					} else {
+
+						o += fmt.Sprintf("> *%v* - %v\n", c.Name, c.ShortDescription)
+					}
+				}
+			}
+		}
+
+	} else {
+		o = GetHelpForPlugin([]string{"", "help", "help", ""})
+	}
+
+	if o == "" {
+		o = fmt.Sprintf("Sorry but I cannot find help for `%v`", matches[0])
+	}
+	return o
 }

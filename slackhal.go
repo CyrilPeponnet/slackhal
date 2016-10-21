@@ -23,20 +23,28 @@ var bot botInfo
 
 // Send a message accoring to what's need to be sent.
 func Send(m *slack.Msg, r *plugin.SlackResponse, rtm *slack.RTM, api *slack.Client) {
+	if r.Text == "" && r.Params == nil {
+		return
+	}
 	// If channed id is not set, then set it as where it came from.
 	if r.ChannelID == "" {
 		r.ChannelID = m.Channel
 	}
+	if strings.HasPrefix(r.ChannelID, "U") {
+		r.ChannelID = FindUserChannel(api, r.ChannelID)
+	}
+	Log.WithFields(logrus.Fields{"prefix": "[main]", "Channel": r.ChannelID, "Message": r.Text, "Params": r.Params}).Debug("Sending Message")
 	if r.Params != nil {
 		c, t, e := api.PostMessage(r.ChannelID, r.Text, *r.Params)
 		if e != nil {
-			log.Errorf("Error while sending message %v", e)
+			Log.Errorf("Error while sending message %v", e)
 		} else {
-			log.Debugf("Send message %v to %v at %v", r.Text, c, t)
+			Log.Debugf("Sent message %v to %v at %v", r.Text, c, t)
 		}
 	} else {
 		msg := slack.OutgoingMessage{Channel: r.ChannelID, Text: r.Text, Type: "message"}
 		rtm.SendMessage(&msg)
+		Log.Debugf("Sent message %v", msg)
 	}
 }
 
@@ -64,7 +72,9 @@ Options:
 
 	// Loading our plugin if needed
 	for _, p := range plugin.PluginManager.Plugins {
-		log.Infof("Loading plugin %v version %v", p.GetMetadata().Name, p.GetMetadata().Version)
+		meta := p.GetMetadata()
+		meta.Logger = Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name))
+		Log.WithField("prefix", "[main]").Infof("Loading plugin %v version %v", meta.Name, meta.Version)
 		p.Init()
 	}
 
@@ -78,14 +88,14 @@ Loop:
 				// Ignore hello
 
 			case *slack.ConnectedEvent:
-				log.WithFields(logrus.Fields{"Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
+				Log.WithFields(logrus.Fields{"prefix": "[main]", "Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
 				info := rtm.GetInfo()
 				bot.Name = info.User.Name
 				bot.ID = info.User.ID
-				log.Infof("Connected as %v", bot.Name)
+				Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
 
 			case *slack.MessageEvent:
-				log.Debugf("Message: %+v", ev)
+				Log.WithField("prefix", "[main]").Debugf("Message: %+v", ev)
 				// Discard messages comming from myself
 				if ev.User == bot.ID {
 					continue
@@ -112,7 +122,8 @@ Loop:
 									strings.HasPrefix(ev.Msg.Text, fmt.Sprintf("<@%v> ", bot.ID)+c.Name) ||
 									// Look for DM with action
 									(strings.HasPrefix(ev.Msg.Channel, "D") && strings.HasPrefix(ev.Msg.Text, c.Name)) {
-									response, err := p.ProcessMessage([]string{c.Name}, &ev.Msg)
+									Log.WithFields(logrus.Fields{"prefix": "[main]", "Command": c.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
+									response, err := p.ProcessMessage([]string{c.Name}, ev.Msg)
 									if err == nil && response != nil {
 										Send(&ev.Msg, response, rtm, api)
 									}
@@ -124,11 +135,12 @@ Loop:
 							if (mentionned && info.WhenMentionned) || !info.WhenMentionned {
 								reg, err := regexp.Compile(r.Name)
 								if err != nil {
-									log.Errorf("Passive trigger %v for %v is not a valid regular expression.", r, info.Name)
+									Log.WithField("prefix", "[main]").Errorf("Passive trigger %v for %v is not a valid regular expression.", r, info.Name)
 								} else {
 									matches := reg.FindAllString(ev.Msg.Text, -1)
 									if len(matches) > 0 {
-										response, err := p.ProcessMessage(matches, &ev.Msg)
+										Log.WithFields(logrus.Fields{"prefix": "[main]", "Trigger": r.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
+										response, err := p.ProcessMessage(matches, ev.Msg)
 										if err == nil && response != nil {
 											Send(&ev.Msg, response, rtm, api)
 										}
@@ -141,7 +153,7 @@ Loop:
 				}()
 
 			case *slack.PresenceChangeEvent:
-				log.Debug("Presence Change: %v", ev)
+				// Log.WithField("prefix", "[main]").Debug("Presence Change: %v", ev)
 
 			case *slack.ChannelJoinedEvent:
 				// nothing
@@ -153,18 +165,18 @@ Loop:
 				// experimental and not used
 
 			case *slack.LatencyReport:
-				log.Debugf("Current latency: %v", ev.Value)
+				Log.WithField("prefix", "[main]").Debugf("Current latency: %v", ev.Value)
 
 			case *slack.RTMError:
-				log.Errorf("Error: %s\n", ev.Error())
+				Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())
 
 			case *slack.InvalidAuthEvent:
-				log.Error("Invalid credentials provided!")
+				Log.WithField("prefix", "[main]").Error("Invalid credentials provided!")
 				break Loop
 
 			default:
 				// ingore other events
-				log.WithFields(logrus.Fields{"event": fmt.Sprintf("%+v", msg.Data), "type": fmt.Sprintf("%T", ev)}).Debug("Received:")
+				// Log.WithFields(logrus.Fields{"prefix": "[main]", "event": fmt.Sprintf("%+v", msg.Data), "type": fmt.Sprintf("%T", ev)}).Debug("Received:")
 			}
 		}
 	}

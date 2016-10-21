@@ -11,3 +11,14 @@ func FindChannelByName(rtm *slack.RTM, name string) *slack.Channel {
 	}
 	return nil
 }
+
+// FindUserChannel - Find a IM channel by username
+func FindUserChannel(api *slack.Client, user string) string {
+	chans, _ := api.GetIMChannels()
+	for _, ch := range chans {
+		if ch.User == user {
+			return ch.ID
+		}
+	}
+	return ""
+}

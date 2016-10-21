@@ -7,26 +7,27 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
-var log = logrus.New()
+// Log factory
+var Log = logrus.New()
 
 func init() {
-	log.Formatter = new(prefixed.TextFormatter)
-	log.Level = logrus.ErrorLevel
+	Log.Formatter = new(prefixed.TextFormatter)
+	Log.Level = logrus.ErrorLevel
 }
 
 func setLogLevel(level string) {
 	switch strings.ToLower(level) {
 	case "debug":
-		log.Level = logrus.DebugLevel
+		Log.Level = logrus.DebugLevel
 	case "info":
-		log.Level = logrus.InfoLevel
+		Log.Level = logrus.InfoLevel
 	case "warn":
-		log.Level = logrus.WarnLevel
+		Log.Level = logrus.WarnLevel
 	case "error":
-		log.Level = logrus.ErrorLevel
+		Log.Level = logrus.ErrorLevel
 	case "critical":
-		log.Level = logrus.FatalLevel
+		Log.Level = logrus.FatalLevel
 	default:
-		log.Level = logrus.ErrorLevel
+		Log.Level = logrus.ErrorLevel
 	}
 }

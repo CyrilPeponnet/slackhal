@@ -24,7 +24,7 @@ func (h *echo) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *echo) ProcessMessage(cmds []string, m *slack.Msg) (o *plugin.SlackResponse, e error) {
+func (h *echo) ProcessMessage(cmds []string, m slack.Msg) (o *plugin.SlackResponse, e error) {
 	for _, c := range cmds {
 		if c == "echo" {
 			o = new(plugin.SlackResponse)
