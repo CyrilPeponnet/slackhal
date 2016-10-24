@@ -21,6 +21,8 @@ func DispatchResponses(output chan *plugin.SlackResponse, rtm *slack.RTM, api *s
 			switch {
 			case msg.Text == "" && msg.Params == nil:
 				Log.Warnf("Nothing to send for message %v", msg)
+			case msg.Channel == "":
+				Log.Warnf("No channel found for message %v", msg)
 			case msg.Params != nil:
 				c, t, e := api.PostMessage(msg.Channel, msg.Text, *msg.Params)
 				if e != nil {

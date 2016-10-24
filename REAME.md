@@ -4,6 +4,7 @@
 
 [] Use a config file
 [] allow to disable plugins
+[] permission plugin
 
 ## Usage
 
@@ -43,6 +44,33 @@ Must return a `plugin.Metadata` struct. This is used to register you plugin.
 Will be called when an action or a trigger is found in an incoming message. You can check `slack.Msg` type [here](https://godoc.org/github.com/nlopes/slack#Msg).
 
 To send your reponse you can send `*plugin.SlackResponse` instances to the `output` channel provided.
+
+
+### Registering your plugin
+
+The registration process is done in the `init` function
+
+```go
+func init() {
+	loggerer := new(logger)
+	loggerer.Metadata = plugin.NewMetadata("logger")
+	loggerer.Description = "Logger messages"
+	loggerer.PassiveTriggers = []plugin.Command{plugin.Command{Name: `.*`, ShortDescription: "Log everything", LongDescription: "Will intercept all messages to log them."}}
+	plugin.PluginManager.Register(loggerer)
+}
+```
+
+This is where you will initialise the `plugin.Metadata` struct and add your commands / triggers. It must end with a call to `plugin.PluginManager.Register()` function call to load you plugin.
+
+### Package consideration
+
+If you are not creating your plugin under the `buitin` package you will need to update `slackhal.go` to import your module like:
+
+```go
+_ "github.com/slackhal/plugins/myplugin"
+```
+
+where `myplugin` is your package name (`package myplugin` as first line in your source code files).
 
 ### Example:
 

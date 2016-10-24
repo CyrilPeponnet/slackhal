@@ -30,6 +30,7 @@ Usage: slackhal [options] [--plugin-path path...]
 Options:
 	-h, --help              Show this help.
 	-t, --token token       The slack bot token to use.
+	-f, --file confing		The configuration file to load [default ./slackhal.yml]
 	-p, --plugin-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char          The char used to detect direct commands [default: !].
 	-l, --log level         Set the log level [default: error].
@@ -38,7 +39,13 @@ Options:
 	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
 	setLogLevel(args["--log"].(string))
 
+	// Load configuraiton file and override some args if needed.
+
 	// Connect to slack and start runloop
+	if args["--token"] == nil {
+		Log.Fatal("You need to set the slack bot token!")
+	}
+
 	api := slack.New(args["--token"].(string))
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
