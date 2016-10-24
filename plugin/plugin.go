@@ -18,7 +18,6 @@ type Metadata struct {
 	PassiveTriggers []Command
 	// Only trigger this plugin if the bot is mentionned
 	WhenMentionned bool
-	Logger         *logrus.Entry
 }
 
 // Command is a Command implemented by a plugin
@@ -39,14 +38,14 @@ func NewMetadata(name string) (m Metadata) {
 
 // SlackResponse struct
 type SlackResponse struct {
-	ChannelID string
-	Text      string
-	Params    *slack.PostMessageParameters
+	Channel string
+	Text    string
+	Params  *slack.PostMessageParameters
 }
 
 // Plugin Interface
 type Plugin interface {
-	Init()
+	Init(Logger *logrus.Entry)
 	GetMetadata() *Metadata
-	ProcessMessage(command []string, message slack.Msg) (response *SlackResponse, err error)
+	ProcessMessage(commands []string, message slack.Msg, output chan<- *SlackResponse)
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
 	"github.com/slackhal/plugin"
 )
@@ -27,7 +28,7 @@ func init() {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *help) Init() {
+func (h *help) Init(Logger *logrus.Entry) {
 	// Nothing to do
 }
 
@@ -37,14 +38,13 @@ func (h *help) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *help) ProcessMessage(cmds []string, m slack.Msg) (o *plugin.SlackResponse, e error) {
+func (h *help) ProcessMessage(commands []string, message slack.Msg, output chan<- *plugin.SlackResponse) {
 	helpPluginPattern := regexp.MustCompile(`(help)\s*(\S*)\s*(\S*)`)
-	o = new(plugin.SlackResponse)
-	h.Logger.Warn(cmds)
-	for _, c := range cmds {
+	o := new(plugin.SlackResponse)
+	for _, c := range commands {
 		switch {
-		case helpPluginPattern.MatchString(m.Text):
-			p := helpPluginPattern.FindStringSubmatch(m.Text)
+		case helpPluginPattern.MatchString(message.Text):
+			p := helpPluginPattern.FindStringSubmatch(message.Text)
 			o.Text = GetHelpForPlugin(p)
 		case c == "list-plugins":
 			o.Text = PluginList()
@@ -54,8 +54,8 @@ func (h *help) ProcessMessage(cmds []string, m slack.Msg) (o *plugin.SlackRespon
 			o.Text = PluginListTriggers()
 		}
 	}
-	o.ChannelID = m.User
-	return
+	o.Channel = message.User
+	output <- o
 }
 
 // PluginListTriggers list plugins actions

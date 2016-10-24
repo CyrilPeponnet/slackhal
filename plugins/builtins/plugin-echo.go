@@ -3,6 +3,7 @@ package builtins
 import (
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
 	"github.com/slackhal/plugin"
 )
@@ -14,7 +15,7 @@ type echo struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *echo) Init() {
+func (h *echo) Init(Logger *logrus.Entry) {
 	// Nothing to do
 }
 
@@ -24,14 +25,15 @@ func (h *echo) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *echo) ProcessMessage(cmds []string, m slack.Msg) (o *plugin.SlackResponse, e error) {
-	for _, c := range cmds {
+func (h *echo) ProcessMessage(commands []string, message slack.Msg, output chan<- *plugin.SlackResponse) {
+	for _, c := range commands {
 		if c == "echo" {
-			o = new(plugin.SlackResponse)
-			o.Text = strings.Replace(m.Text, c+" ", "", 1)
+			o := new(plugin.SlackResponse)
+			o.Text = strings.Replace(message.Text, c+" ", "", 1)
+			o.Channel = message.Channel
+			output <- o
 		}
 	}
-	return
 }
 
 // init function that will register your plugin to the plugin manager

@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
 	"github.com/slackhal/plugin"
 )
@@ -12,7 +13,7 @@ type jiratrigger struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *jiratrigger) Init() {
+func (h *jiratrigger) Init(Logger *logrus.Entry) {
 	// Nothing to do
 }
 
@@ -22,13 +23,14 @@ func (h *jiratrigger) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *jiratrigger) ProcessMessage(cmds []string, m slack.Msg) (o *plugin.SlackResponse, e error) {
-	o = new(plugin.SlackResponse)
+func (h *jiratrigger) ProcessMessage(commands []string, message slack.Msg, output chan<- *plugin.SlackResponse) {
+	o := new(plugin.SlackResponse)
 	o.Text = "I found some jira issue there "
-	for _, c := range cmds {
+	for _, c := range commands {
 		o.Text += c + " "
 	}
-	return
+	o.Channel = message.Channel
+	output <- o
 }
 
 // init function that will register your plugin to the plugin manager

@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 
 	"github.com/slackhal/plugin"
 
@@ -21,61 +19,39 @@ type botInfo struct {
 
 var bot botInfo
 
-// Send a message accoring to what's need to be sent.
-func Send(m *slack.Msg, r *plugin.SlackResponse, rtm *slack.RTM, api *slack.Client) {
-	if r.Text == "" && r.Params == nil {
-		return
-	}
-	// If channed id is not set, then set it as where it came from.
-	if r.ChannelID == "" {
-		r.ChannelID = m.Channel
-	}
-	if strings.HasPrefix(r.ChannelID, "U") {
-		r.ChannelID = FindUserChannel(api, r.ChannelID)
-	}
-	Log.WithFields(logrus.Fields{"prefix": "[main]", "Channel": r.ChannelID, "Message": r.Text, "Params": r.Params}).Debug("Sending Message")
-	if r.Params != nil {
-		c, t, e := api.PostMessage(r.ChannelID, r.Text, *r.Params)
-		if e != nil {
-			Log.Errorf("Error while sending message %v", e)
-		} else {
-			Log.Debugf("Sent message %v to %v at %v", r.Text, c, t)
-		}
-	} else {
-		msg := slack.OutgoingMessage{Channel: r.ChannelID, Text: r.Text, Type: "message"}
-		rtm.SendMessage(&msg)
-		Log.Debugf("Sent message %v", msg)
-	}
-}
-
 func main() {
 	headline := "Slack HAL bot."
 	usage := `
 
 This is another slack bot.
 
-Usage: zabbix-autohost [options] [--plugin-path path...]
+Usage: slackhal [options] [--plugin-path path...]
 
 Options:
 	-h, --help              Show this help.
-	-t, --token token       The slack bot token to use [default: xoxb-91603848178-q19vBaxCqfUQPm2kNQ9hlvWv].
+	-t, --token token       The slack bot token to use.
 	-p, --plugin-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char          The char used to detect direct commands [default: !].
-	-l, --log level         Set the log level [default: debug].
+	-l, --log level         Set the log level [default: error].
 `
+
 	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
 	setLogLevel(args["--log"].(string))
 
+	// Connect to slack and start runloop
 	api := slack.New(args["--token"].(string))
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
 
-	// Loading our plugin if needed
+	// output channels and start the runloop
+	output := make(chan *plugin.SlackResponse)
+	go DispatchResponses(output, rtm, api)
+
+	// Loading our plugin and Init them
 	for _, p := range plugin.PluginManager.Plugins {
 		meta := p.GetMetadata()
-		meta.Logger = Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name))
 		Log.WithField("prefix", "[main]").Infof("Loading plugin %v version %v", meta.Name, meta.Version)
-		p.Init()
+		p.Init(Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name)))
 	}
 
 Loop:
@@ -100,57 +76,7 @@ Loop:
 				if ev.User == bot.ID {
 					continue
 				}
-				go func() {
-					// Process our plugins
-					// TODO: If we need to use atachement we need to use the api.PostMessage.
-
-					// Action are always the first word and must starts with a !
-					// @mention + command without the ! works too
-					// DM with ! or not but first word are considered as actions too
-
-					commandPrefix := args["--trigger"].(string)
-					mentionned := strings.HasPrefix(ev.Msg.Channel, "D") || strings.Contains(ev.Msg.Text, fmt.Sprintf("<@%v>", bot.ID))
-
-					// Process active triggers
-					for _, p := range plugin.PluginManager.Plugins {
-						info := p.GetMetadata()
-						for _, c := range info.ActiveTriggers {
-							if (mentionned && info.WhenMentionned) || !info.WhenMentionned {
-								// Look for !action
-								if strings.Contains(ev.Msg.Text, commandPrefix+c.Name) ||
-									// Look for @bot action
-									strings.HasPrefix(ev.Msg.Text, fmt.Sprintf("<@%v> ", bot.ID)+c.Name) ||
-									// Look for DM with action
-									(strings.HasPrefix(ev.Msg.Channel, "D") && strings.HasPrefix(ev.Msg.Text, c.Name)) {
-									Log.WithFields(logrus.Fields{"prefix": "[main]", "Command": c.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
-									response, err := p.ProcessMessage([]string{c.Name}, ev.Msg)
-									if err == nil && response != nil {
-										Send(&ev.Msg, response, rtm, api)
-									}
-								}
-							}
-						}
-						// Process passive triggers
-						for _, r := range info.PassiveTriggers {
-							if (mentionned && info.WhenMentionned) || !info.WhenMentionned {
-								reg, err := regexp.Compile(r.Name)
-								if err != nil {
-									Log.WithField("prefix", "[main]").Errorf("Passive trigger %v for %v is not a valid regular expression.", r, info.Name)
-								} else {
-									matches := reg.FindAllString(ev.Msg.Text, -1)
-									if len(matches) > 0 {
-										Log.WithFields(logrus.Fields{"prefix": "[main]", "Trigger": r.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
-										response, err := p.ProcessMessage(matches, ev.Msg)
-										if err == nil && response != nil {
-											Send(&ev.Msg, response, rtm, api)
-										}
-									}
-
-								}
-							}
-						}
-					}
-				}()
+				go DispatchMessage(args["--trigger"].(string), &ev.Msg, output)
 
 			case *slack.PresenceChangeEvent:
 				// Log.WithField("prefix", "[main]").Debug("Presence Change: %v", ev)
