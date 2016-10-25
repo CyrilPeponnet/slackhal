@@ -2,9 +2,8 @@
 
 ## TODO
 
-[] Use a config file
-[] allow to disable plugins
 [] permission plugin
+[] logger plugin - we need to find a UI for that.
 
 ## Usage
 
@@ -17,6 +16,22 @@ Options:
 	-p, --plugin-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char          The char used to detect direct commands [default: !].
 	-l, --log level         Set the log level [default: error].
+```
+
+## Configuration file
+
+Example of yaml configuration file:
+
+```
+bot:
+  token: "yourtoken"
+  trigger: "!"
+  log:
+    level: debug
+  plugins:
+    disabled:
+      - echo
+      - logger
 ```
 
 # Plugins

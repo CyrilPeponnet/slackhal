@@ -63,6 +63,9 @@ func PluginListTriggers() (o string) {
 	l := ""
 	for _, p := range plugin.PluginManager.Plugins {
 		info := p.GetMetadata()
+		if info.Disabled {
+			continue
+		}
 		a := ""
 		for _, c := range info.PassiveTriggers {
 			a += fmt.Sprintf(">_%v_  - %v\n", c.Name, c.ShortDescription)
@@ -86,6 +89,9 @@ func PluginListActions() (o string) {
 	l := ""
 	for _, p := range plugin.PluginManager.Plugins {
 		info := p.GetMetadata()
+		if info.Disabled {
+			continue
+		}
 		a := ""
 		for _, c := range info.ActiveTriggers {
 			a += fmt.Sprintf(">_%v_  - %v\n", c.Name, c.ShortDescription)
@@ -109,6 +115,9 @@ func PluginList() (o string) {
 	o = "Here is my plugin list:\n"
 	for _, p := range plugin.PluginManager.Plugins {
 		info := p.GetMetadata()
+		if info.Disabled {
+			continue
+		}
 		o += fmt.Sprintf(">*%v* (%v) - %v\n", info.Name, info.Version, info.Description)
 	}
 	return
@@ -119,6 +128,9 @@ func GetHelpForPlugin(matches []string) (o string) {
 	if matches[3] != "" || matches[2] != "" {
 		for _, p := range plugin.PluginManager.Plugins {
 			info := p.GetMetadata()
+			if info.Disabled {
+				continue
+			}
 			if info.Name == matches[2] {
 				o = fmt.Sprintf("*%v* (%v) - %v\n", info.Name, info.Version, info.Description)
 				for _, c := range info.ActiveTriggers {

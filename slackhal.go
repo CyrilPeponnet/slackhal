@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/slackhal/plugin"
+	"github.com/spf13/viper"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt-go"
@@ -31,15 +32,30 @@ Options:
 	-h, --help              Show this help.
 	-t, --token token       The slack bot token to use.
 	-f, --file confing		The configuration file to load [default ./slackhal.yml]
-	-p, --plugin-path path  The paths to the plugins folder to load [default: ./plugins].
+	-p, --plugins-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char          The char used to detect direct commands [default: !].
 	-l, --log level         Set the log level [default: error].
 `
 
 	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
-	setLogLevel(args["--log"].(string))
+	disabledPlugins := []string{}
 
 	// Load configuraiton file and override some args if needed.
+
+	if args["--file"] != nil {
+		viper.SetConfigFile(args["--file"].(string))
+		err := viper.ReadInConfig()
+		if err != nil {
+			Log.Errorf("Cannot read the provided configuration file: %v", err)
+			return
+		}
+		args["--token"] = viper.GetString("bot.token")
+		args["--log"] = viper.GetString("bot.log.level")
+		args["--trigger"] = viper.GetString("bot.trigger")
+		disabledPlugins = viper.GetStringSlice("bot.plugins.disabled")
+	}
+
+	setLogLevel(args["--log"].(string))
 
 	// Connect to slack and start runloop
 	if args["--token"] == nil {
@@ -55,8 +71,17 @@ Options:
 	go DispatchResponses(output, rtm, api)
 
 	// Loading our plugin and Init them
+
+Loading:
 	for _, p := range plugin.PluginManager.Plugins {
 		meta := p.GetMetadata()
+		for _, disabled := range disabledPlugins {
+			if meta.Name == disabled {
+				Log.WithField("prefix", "[main]").Infof("Plugin %v is disabled in configuration.", meta.Name)
+				meta.Disabled = true
+				continue Loading
+			}
+		}
 		Log.WithField("prefix", "[main]").Infof("Loading plugin %v version %v", meta.Name, meta.Version)
 		p.Init(Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name)))
 	}

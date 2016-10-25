@@ -48,14 +48,17 @@ func DispatchMessage(prefix string, msg *slack.Msg, output chan<- *plugin.SlackR
 	// Process active triggers
 	for _, p := range plugin.PluginManager.Plugins {
 		info := p.GetMetadata()
+		if info.Disabled {
+			continue
+		}
 		for _, c := range info.ActiveTriggers {
 			if (mentionned && info.WhenMentionned) || !info.WhenMentionned {
 				// Look for !action
 				if strings.Contains(msg.Text, prefix+c.Name) ||
 					// Look for @bot action
-					strings.HasPrefix(msg.Text, fmt.Sprintf("<@%v> ", bot.ID)+c.Name) ||
+					(strings.HasPrefix(msg.Text, fmt.Sprintf("<@%v> ", bot.ID)) && strings.Contains(msg.Text, c.Name)) ||
 					// Look for DM with action
-					(strings.HasPrefix(msg.Channel, "D") && strings.HasPrefix(msg.Text, c.Name)) {
+					(strings.HasPrefix(msg.Channel, "D") && strings.Contains(msg.Text, c.Name)) {
 					// Check if the user have permissions to use this plugin.
 					Log.WithFields(logrus.Fields{"prefix": "[main]", "Command": c.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
 					p.ProcessMessage([]string{c.Name}, *msg, output)

@@ -18,6 +18,8 @@ type Metadata struct {
 	PassiveTriggers []Command
 	// Only trigger this plugin if the bot is mentionned
 	WhenMentionned bool
+	// Disabled state
+	Disabled bool
 }
 
 // Command is a Command implemented by a plugin
@@ -33,6 +35,7 @@ func NewMetadata(name string) (m Metadata) {
 	m.Description = fmt.Sprintf("%v's description", name)
 	m.Version = "1.0"
 	m.WhenMentionned = false
+	m.Disabled = false
 	return
 }
 
