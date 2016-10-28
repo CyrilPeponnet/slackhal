@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
@@ -16,10 +17,14 @@ type Metadata struct {
 	ActiveTriggers []Command
 	// Passive triggers are regex parterns that will try to get matched
 	PassiveTriggers []Command
+	// Webhook handler
+	HTTPHandler map[Command]http.Handler
 	// Only trigger this plugin if the bot is mentionned
 	WhenMentionned bool
 	// Disabled state
 	Disabled bool
+	// self
+	Self interface{}
 }
 
 // Command is a Command implemented by a plugin
@@ -36,6 +41,7 @@ func NewMetadata(name string) (m Metadata) {
 	m.Version = "1.0"
 	m.WhenMentionned = false
 	m.Disabled = false
+	m.HTTPHandler = make(map[Command]http.Handler)
 	return
 }
 
@@ -48,7 +54,7 @@ type SlackResponse struct {
 
 // Plugin Interface
 type Plugin interface {
-	Init(Logger *logrus.Entry)
+	Init(Logger *logrus.Entry, output chan<- *SlackResponse)
 	GetMetadata() *Metadata
-	ProcessMessage(commands []string, message slack.Msg, output chan<- *SlackResponse)
+	ProcessMessage(commands []string, message slack.Msg)
 }

@@ -13,12 +13,14 @@ import (
 type cat struct {
 	plugin.Metadata
 	Logger *logrus.Entry
+	sink   chan<- *plugin.SlackResponse
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *cat) Init(Logger *logrus.Entry) {
+func (h *cat) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
 	// cats are initless
+	h.sink = output
 }
 
 // GetMetadata interface implementation
@@ -27,7 +29,7 @@ func (h *cat) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *cat) ProcessMessage(commands []string, message slack.Msg, output chan<- *plugin.SlackResponse) {
+func (h *cat) ProcessMessage(commands []string, message slack.Msg) {
 	// Cat summoned !
 	o := new(plugin.SlackResponse)
 	o.Channel = message.Channel
@@ -37,7 +39,7 @@ func (h *cat) ProcessMessage(commands []string, message slack.Msg, output chan<-
 	} else {
 		o.Text = fmt.Sprintf("Hey <@%v> look what I just found for you: %v", message.User, response.Request.URL)
 	}
-	output <- o
+	h.sink <- o
 	defer response.Body.Close()
 }
 

@@ -12,6 +12,7 @@ import (
 // help struct define your plugin
 type help struct {
 	plugin.Metadata
+	sink chan<- *plugin.SlackResponse
 }
 
 // init function that will register your plugin to the plugin manager
@@ -22,14 +23,15 @@ func init() {
 	helper.ActiveTriggers = []plugin.Command{plugin.Command{Name: "help", ShortDescription: "Will provide some help :)"},
 		plugin.Command{Name: "list-plugins", ShortDescription: "List all enabled plugins"},
 		plugin.Command{Name: "list-commands", ShortDescription: "List all available commands"},
+		plugin.Command{Name: "list-handlers", ShortDescription: "List all available HTTP handlers"},
 		plugin.Command{Name: "list-triggers", ShortDescription: "List all passive triggers"}}
 	plugin.PluginManager.Register(helper)
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *help) Init(Logger *logrus.Entry) {
-	// Nothing to do
+func (h *help) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
+	h.sink = output
 }
 
 // GetMetadata interface implementation
@@ -38,7 +40,7 @@ func (h *help) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *help) ProcessMessage(commands []string, message slack.Msg, output chan<- *plugin.SlackResponse) {
+func (h *help) ProcessMessage(commands []string, message slack.Msg) {
 	helpPluginPattern := regexp.MustCompile(`(help)\s*(\S*)\s*(\S*)`)
 	o := new(plugin.SlackResponse)
 	for _, c := range commands {
@@ -50,15 +52,17 @@ func (h *help) ProcessMessage(commands []string, message slack.Msg, output chan<
 			o.Text = PluginList()
 		case c == "list-commands":
 			o.Text = PluginListActions()
+		case c == "list-handlers":
+			o.Text = PluginListHandlers()
 		case c == "list-triggers":
 			o.Text = PluginListTriggers()
 		}
 	}
 	o.Channel = message.User
-	output <- o
+	h.sink <- o
 }
 
-// PluginListTriggers list plugins actions
+// PluginListTriggers list plugins triggers
 func PluginListTriggers() (o string) {
 	l := ""
 	for _, p := range plugin.PluginManager.Plugins {
@@ -80,6 +84,32 @@ func PluginListTriggers() (o string) {
 		o += l
 	} else {
 		o = "Cannot find any passive triggers."
+	}
+	return
+}
+
+// PluginListHandlers list plugins handlers
+func PluginListHandlers() (o string) {
+	l := ""
+	for _, p := range plugin.PluginManager.Plugins {
+		info := p.GetMetadata()
+		if info.Disabled {
+			continue
+		}
+		a := ""
+		for c := range info.HTTPHandler {
+			a += fmt.Sprintf(">_%v_  - %v\n", c.Name, c.ShortDescription)
+		}
+		if a != "" {
+			l += fmt.Sprintf("\n*%v* (%v) - %v\n", info.Name, info.Version, info.Description)
+			l += a
+		}
+	}
+	if l != "" {
+		o = "Here are all the HTTP Handlers enabled:\n"
+		o += l
+	} else {
+		o = "Cannot find any HTTP handlers."
 	}
 	return
 }

@@ -1,15 +1,16 @@
 package main
 
 import (
-	"fmt"
+	"github.com/fatih/color"
 
 	"github.com/slackhal/plugin"
 	"github.com/spf13/viper"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt-go"
 	"github.com/nlopes/slack"
 	_ "github.com/slackhal/plugins/builtins"
+	_ "github.com/slackhal/plugins/plugin-github"
+	_ "github.com/slackhal/plugins/plugin-jira"
 )
 
 // Bot info
@@ -29,13 +30,20 @@ This is another slack bot.
 Usage: slackhal [options] [--plugin-path path...]
 
 Options:
-	-h, --help              Show this help.
-	-t, --token token       The slack bot token to use.
-	-f, --file confing		The configuration file to load [default ./slackhal.yml]
+	-h, --help               Show this help.
+	-t, --token token        The slack bot token to use.
+	-f, --file confing		 The configuration file to load [default ./slackhal.yml]
 	-p, --plugins-path path  The paths to the plugins folder to load [default: ./plugins].
-	--trigger char          The char used to detect direct commands [default: !].
-	-l, --log level         Set the log level [default: error].
+	--trigger char           The char used to detect direct commands [default: !].
+	--handler port			 The Port of the http handler [default: :8080].
+	-l, --log level          Set the log level [default: error].
 `
+	color.Blue(` __ _            _                _
+/ _\ | ____  ___| | __ /\  /\____| |
+\ \| |/ _  |/ __| |/ // /_/ / _  | |
+_\ \ | (_| | (__|   </ __  / (_| | |
+\__/_|\__,_|\___|_|\_\/ /_/ \__,_|_|
+                                    `)
 
 	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
 	disabledPlugins := []string{}
@@ -52,6 +60,7 @@ Options:
 		args["--token"] = viper.GetString("bot.token")
 		args["--log"] = viper.GetString("bot.log.level")
 		args["--trigger"] = viper.GetString("bot.trigger")
+		args["--handler"] = viper.GetString("bot.handler")
 		disabledPlugins = viper.GetStringSlice("bot.plugins.disabled")
 	}
 
@@ -68,23 +77,8 @@ Options:
 
 	// output channels and start the runloop
 	output := make(chan *plugin.SlackResponse)
-	go DispatchResponses(output, rtm, api)
 
-	// Loading our plugin and Init them
-
-Loading:
-	for _, p := range plugin.PluginManager.Plugins {
-		meta := p.GetMetadata()
-		for _, disabled := range disabledPlugins {
-			if meta.Name == disabled {
-				Log.WithField("prefix", "[main]").Infof("Plugin %v is disabled in configuration.", meta.Name)
-				meta.Disabled = true
-				continue Loading
-			}
-		}
-		Log.WithField("prefix", "[main]").Infof("Loading plugin %v version %v", meta.Name, meta.Version)
-		p.Init(Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name)))
-	}
+	Log.Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do")
 
 Loop:
 	for {
@@ -96,19 +90,29 @@ Loop:
 				// Ignore hello
 
 			case *slack.ConnectedEvent:
-				Log.WithFields(logrus.Fields{"prefix": "[main]", "Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
+				// Log.WithFields(logrus.Fields{"prefix": "[main]", "Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
 				info := rtm.GetInfo()
 				bot.Name = info.User.Name
 				bot.ID = info.User.ID
 				Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
+				Log.WithField("prefix", "[main]").Debugf("with id %v", bot.ID)
+				// Init our plugins
+				initPLugins(disabledPlugins, output)
+				// Start our Response dispatching run loop
+				go DispatchResponses(output, rtm, api)
 
 			case *slack.MessageEvent:
 				Log.WithField("prefix", "[main]").Debugf("Message: %+v", ev)
-				// Discard messages comming from myself
+				// Discard messages comming from myself or bots
 				if ev.User == bot.ID {
 					continue
 				}
-				go DispatchMessage(args["--trigger"].(string), &ev.Msg, output)
+				for _, bot := range rtm.GetInfo().Bots {
+					if ev.BotID == bot.ID {
+						continue Loop
+					}
+				}
+				go DispatchMessage(args["--trigger"].(string), &ev.Msg)
 
 			case *slack.PresenceChangeEvent:
 				// Log.WithField("prefix", "[main]").Debug("Presence Change: %v", ev)

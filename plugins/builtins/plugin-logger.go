@@ -14,7 +14,7 @@ type logger struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *logger) Init(Logger *logrus.Entry) {
+func (h *logger) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
 	h.Logger = Logger
 }
 
@@ -24,7 +24,7 @@ func (h *logger) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *logger) ProcessMessage(commands []string, message slack.Msg, output chan<- *plugin.SlackResponse) {
+func (h *logger) ProcessMessage(commands []string, message slack.Msg) {
 	h.Logger.Infof("Will log message %v", message.Text)
 }
 

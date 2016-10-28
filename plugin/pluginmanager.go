@@ -6,7 +6,7 @@ var PluginManager Manager
 // Manager contains the loaded plugins
 type Manager struct {
 	PluginDirs []string
-	Plugins    []Plugin
+	Plugins    map[string]Plugin
 }
 
 // LoadPLugins will load external plugins
@@ -20,5 +20,8 @@ func (m *Manager) LoadPLugins() error {
 
 // Register a new plugin
 func (m *Manager) Register(plugin Plugin) {
-	m.Plugins = append(m.Plugins, plugin)
+	if m.Plugins == nil {
+		m.Plugins = make(map[string]Plugin)
+	}
+	m.Plugins[plugin.GetMetadata().Name] = plugin
 }

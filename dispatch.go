@@ -17,6 +17,8 @@ func DispatchResponses(output chan *plugin.SlackResponse, rtm *slack.RTM, api *s
 		case msg := <-output:
 			if strings.HasPrefix(msg.Channel, "U") {
 				msg.Channel = FindUserChannel(api, msg.Channel)
+			} else if strings.HasPrefix(msg.Channel, "#") {
+				msg.Channel = FindChannelByName(rtm, msg.Channel[1:len(msg.Channel)])
 			}
 			switch {
 			case msg.Text == "" && msg.Params == nil:
@@ -42,7 +44,7 @@ func DispatchResponses(output chan *plugin.SlackResponse, rtm *slack.RTM, api *s
 }
 
 // DispatchMessage to plugins
-func DispatchMessage(prefix string, msg *slack.Msg, output chan<- *plugin.SlackResponse) {
+func DispatchMessage(prefix string, msg *slack.Msg) {
 	mentionned := strings.HasPrefix(msg.Channel, "D") || strings.Contains(msg.Text, fmt.Sprintf("<@%v>", bot.ID))
 
 	// Process active triggers
@@ -61,13 +63,14 @@ func DispatchMessage(prefix string, msg *slack.Msg, output chan<- *plugin.SlackR
 					(strings.HasPrefix(msg.Channel, "D") && strings.Contains(msg.Text, c.Name)) {
 					// Check if the user have permissions to use this plugin.
 					Log.WithFields(logrus.Fields{"prefix": "[main]", "Command": c.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
-					p.ProcessMessage([]string{c.Name}, *msg, output)
+					p.ProcessMessage([]string{c.Name}, *msg)
 				}
 			}
 		}
 		// Process passive triggers
 		for _, r := range info.PassiveTriggers {
 			if (mentionned && info.WhenMentionned) || !info.WhenMentionned {
+				// Check if the user have permissions to use this plugin.
 				reg, err := regexp.Compile(r.Name)
 				if err != nil {
 					Log.WithField("prefix", "[main]").Errorf("Passive trigger %v for %v is not a valid regular expression.", r.Name, info.Name)
@@ -75,7 +78,7 @@ func DispatchMessage(prefix string, msg *slack.Msg, output chan<- *plugin.SlackR
 					matches := reg.FindAllString(msg.Text, -1)
 					if len(matches) > 0 {
 						Log.WithFields(logrus.Fields{"prefix": "[main]", "Trigger": r.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
-						p.ProcessMessage(matches, *msg, output)
+						p.ProcessMessage(matches, *msg)
 					}
 
 				}

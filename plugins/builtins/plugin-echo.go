@@ -11,12 +11,13 @@ import (
 // echo struct define your plugin
 type echo struct {
 	plugin.Metadata
+	sink chan<- *plugin.SlackResponse
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *echo) Init(Logger *logrus.Entry) {
-	// Nothing to do
+func (h *echo) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
+	h.sink = output
 }
 
 // GetMetadata interface implementation
@@ -25,13 +26,13 @@ func (h *echo) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *echo) ProcessMessage(commands []string, message slack.Msg, output chan<- *plugin.SlackResponse) {
+func (h *echo) ProcessMessage(commands []string, message slack.Msg) {
 	for _, c := range commands {
 		if c == "echo" {
 			o := new(plugin.SlackResponse)
 			o.Text = strings.Replace(message.Text, c+" ", "", 1)
 			o.Channel = message.Channel
-			output <- o
+			h.sink <- o
 		}
 	}
 }
