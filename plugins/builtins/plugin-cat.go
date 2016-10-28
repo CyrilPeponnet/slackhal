@@ -43,6 +43,11 @@ func (h *cat) ProcessMessage(commands []string, message slack.Msg) {
 	defer response.Body.Close()
 }
 
+// Self interface implementation
+func (h *cat) Self() (i interface{}) {
+	return h
+}
+
 // init function that will register your plugin to the plugin manager
 func init() {
 	cater := new(cat)

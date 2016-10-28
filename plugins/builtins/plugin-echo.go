@@ -37,6 +37,11 @@ func (h *echo) ProcessMessage(commands []string, message slack.Msg) {
 	}
 }
 
+// Self interface implementation
+func (h *echo) Self() (i interface{}) {
+	return h
+}
+
 // init function that will register your plugin to the plugin manager
 func init() {
 	echoer := new(echo)

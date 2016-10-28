@@ -72,6 +72,11 @@ func (h *githook) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse
 
 }
 
+// Self interface implementation
+func (h *githook) Self() (i interface{}) {
+	return h
+}
+
 // GetMetadata interface implementation
 func (h *githook) GetMetadata() *plugin.Metadata {
 	return &h.Metadata

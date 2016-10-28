@@ -28,6 +28,11 @@ func (h *logger) ProcessMessage(commands []string, message slack.Msg) {
 	h.Logger.Infof("Will log message %v", message.Text)
 }
 
+// Self interface implementation
+func (h *logger) Self() (i interface{}) {
+	return h
+}
+
 // init function that will register your plugin to the plugin manager
 func init() {
 	loggerer := new(logger)

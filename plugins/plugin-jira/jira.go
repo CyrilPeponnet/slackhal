@@ -38,7 +38,6 @@ type Jira struct {
 func (h *Jira) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
 	h.Logger = Logger
 	h.sink = output
-	h.Self = h
 	h.configuration = viper.New()
 	h.configuration.AddConfigPath(".")
 	h.configuration.SetConfigName("plugin-jira")
@@ -52,6 +51,11 @@ func (h *Jira) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
 		h.password = h.configuration.GetString("server.password")
 	}
 	h.JiraClient, _ = jiralib.NewClient(nil, h.url)
+}
+
+// Self interface implementation
+func (h *Jira) Self() (i interface{}) {
+	return h
 }
 
 // GetMetadata interface implementation

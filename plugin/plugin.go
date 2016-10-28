@@ -23,8 +23,6 @@ type Metadata struct {
 	WhenMentionned bool
 	// Disabled state
 	Disabled bool
-	// self
-	Self interface{}
 }
 
 // Command is a Command implemented by a plugin
@@ -57,4 +55,5 @@ type Plugin interface {
 	Init(Logger *logrus.Entry, output chan<- *SlackResponse)
 	GetMetadata() *Metadata
 	ProcessMessage(commands []string, message slack.Msg)
+	Self() interface{}
 }

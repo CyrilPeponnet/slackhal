@@ -40,18 +40,20 @@ func (h *githook) ProcessPushEvents(event *github.PushEvent) (messages []*plugin
 	// Is the plugin available
 	if jp, ok := plugin.PluginManager.Plugins["jira"]; ok {
 		info := jp.GetMetadata()
-		for _, trigger := range info.PassiveTriggers {
-			reg, err := regexp.Compile(trigger.Name)
-			if err == nil {
-				// If we have matches
-				matches := reg.FindAllString(*event.HeadCommit.Message, -1)
-				for _, m := range matches {
-					// HACK: We are forcing the assertion here
-					if jc, found := info.Self.(*jiraplugin.Jira); found {
-						if jc.Connect() {
-							issue, _, _ := jc.JiraClient.Issue.Get(strings.ToUpper(m[1:len(m)]))
-							if issue != nil {
-								message.Params.Attachments = append(message.Params.Attachments, jc.CreateAttachement(issue))
+		if !info.Disabled {
+			for _, trigger := range info.PassiveTriggers {
+				reg, err := regexp.Compile(trigger.Name)
+				if err == nil {
+					// If we have matches
+					matches := reg.FindAllString(*event.HeadCommit.Message, -1)
+					for _, m := range matches {
+						// HACK: We are forcing the assertion here
+						if jc, found := jp.Self().(*jiraplugin.Jira); found {
+							if jc.Connect() {
+								issue, _, _ := jc.JiraClient.Issue.Get(strings.ToUpper(m[1:len(m)]))
+								if issue != nil {
+									message.Params.Attachments = append(message.Params.Attachments, jc.CreateAttachement(issue))
+								}
 							}
 						}
 					}

@@ -39,6 +39,11 @@ func (h *help) GetMetadata() *plugin.Metadata {
 	return &h.Metadata
 }
 
+// Self interface implementation
+func (h *help) Self() (i interface{}) {
+	return h
+}
+
 // ProcessMessage interface implementation
 func (h *help) ProcessMessage(commands []string, message slack.Msg) {
 	helpPluginPattern := regexp.MustCompile(`(help)\s*(\S*)\s*(\S*)`)

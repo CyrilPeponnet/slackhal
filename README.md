@@ -47,6 +47,7 @@ You plugin must implement the following interfaces:
 Init(Logger *logrus.Entry, output chan<- *SlackResponse)
 GetMetadata() *Metadata
 ProcessMessage(commands []string, message slack.Msg)
+Self() interface{}
 ```
 
 ### The `Init` function
@@ -67,6 +68,46 @@ Will be called when an action or a trigger is found in an incoming message. You 
 
 To send your reponse you can send `*plugin.SlackResponse` instances to the `output` channel provided by `Init` above.
 
+### The `Self` function
+
+This is a dirty hack to access plugin from another plugin.
+
+You will need to expose your plugin structure like:
+
+```go
+type Jira struct {
+```
+
+(note the Uppercase)
+
+Then implement `Self` as:
+
+```go
+// Self interface implementation
+func (h *cat) Self() (i interface{}) {
+	return h
+}
+```
+
+You can then call a plugin from another plugin using the PluginManager map and realize an assertion:
+
+```go
+// Check if the plugin is loaded and not disabled
+if pg, ok := plugin.PluginManager.Plugins["jira"]; ok {
+	// Retrieve metadata
+	info := pg.GetMetadata()
+	// Check if not disabled
+	if ! info.Disabled {
+		// Realize a safe assertion
+		if jp, found := .(*jiraplugin.Jira); found {
+			jp.Connect()
+			...
+		}
+	}
+}
+```
+
+(note that the function you want to call from another plugin needs to be exported as well).
 
 ### Registering your plugin
 
@@ -166,8 +207,6 @@ type Metadata struct {
 	WhenMentionned bool
 	// Disabled state
 	Disabled bool
-	// self
-	Self interface{}
 }
 
 // Command is a Command implemented by a plugin
@@ -194,41 +233,6 @@ Will parse every message to find a match using the POSIX regexp. If you want to 
 ### WhenMentionned
 
 Only call the plugin when mentionned or withing a DM conversation.
-
-### Self
-
-This is a dirty hack to access plugin from another plugin.
-
-You will need to expose the plugin structure like:
-
-```go
-type Jira struct {
-```
-
-Then in `Init` :
-
-```go
-	h.Self = h
-```
-
-You can then call a plugin from another plugin using the PluginManager map and realize an assertion:
-
-```go
-// Check if the plugin is loaded and not disabled
-if jp, ok := plugin.PluginManager.Plugins["jira"]; ok {
-	// Retrieve metadata
-	info := jp.GetMetadata()
-	// Check if not disabled
-	if ! info.Disabled {
-		// Realize a safe assertion
-		if jc, found := info.Self.(*jiraplugin.Jira); found {
-			jc.Connect()
-			...
-		}
-	}
-}
-```
-
 
 ## Response channel
 
