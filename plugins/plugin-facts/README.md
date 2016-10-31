@@ -2,7 +2,6 @@
 
 You can teach some facts and ask them later
 
-
 ```
 m: @bot new-fact How old is the bot
 bot: Ok @m let's do that! Can you define _How old is the bot_?
@@ -20,3 +19,19 @@ Then
 m: @bot how old are you?
 bot: I have no age, I'm forever young.
 ```
+
+## Extra flags upon creation
+
+`channel:lock` ->  restrict a fact to the current channel.
+
+## Configuration file
+
+A yaml named `plugin-facts.yaml` must be present with the following content:
+
+
+```yaml
+database:
+  path: facts.db
+```
+
+Where `database.path` is the path of the fact database.

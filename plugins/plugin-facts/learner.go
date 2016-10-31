@@ -52,10 +52,10 @@ func (f *learn) New(message slack.Msg) string {
 	currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
 	// detect extra options like restrict to a channel, use classifier, content type (go template etc..), mention...
 	channel := ""
-	r, _ := regexp.Compile("chanlock")
+	r, _ := regexp.Compile("channel:lock")
 	if r.MatchString(currentFact) {
 		channel = message.Channel
-		currentFact = r.ReplaceAllString(currentFact, "")
+		currentFact = strings.TrimSpace(r.ReplaceAllString(currentFact, ""))
 	}
 	f.entries = append(f.entries, &learningFact{Channel: message.Channel, User: message.User, Fact: fact{Name: currentFact, OnlyInChan: channel}, State: Content})
 	return fmt.Sprintf("Ok <@%v> let's do that! Can you define _%v_? \n(type stop-learning to stop this learning session)", message.User, currentFact)

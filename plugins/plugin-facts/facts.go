@@ -70,11 +70,42 @@ func (h *facts) ProcessMessage(commands []string, message slack.Msg) {
 			h.simpleResponse(message, h.learner.New(message))
 		case cmdcancel:
 			h.simpleResponse(message, h.learner.Cancel(message))
+		case cmdedit:
+			name := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdedit)+len(cmdedit) : len(message.Text)])
+			foundFact := h.factDB.FindFactByName(name)
+			if foundFact != nil {
+				msg := fmt.Sprintf("Found a fact for _%v_\n", name)
+				msg += fmt.Sprintf("Current content is: \n>_%v_\n", foundFact.Content)
+				msg += fmt.Sprintf("Currents patterns are\n> _%v_\n", strings.Join(foundFact.Patterns, " || "))
+				msg += "Relearning this fact now!"
+				h.simpleResponse(message, msg)
+				// HACK to learn a known fact
+				message.Text = strings.Replace(message.Text, cmdedit, cmdnew, 1)
+				h.simpleResponse(message, h.learner.New(message))
+			} else {
+				h.simpleResponse(message, fmt.Sprintf("Sorry cannot find a fact with name _%v_", name))
+			}
+		case cmddel:
+			name := strings.TrimSpace(message.Text[strings.Index(message.Text, cmddel)+len(cmddel) : len(message.Text)])
+			foundFact := h.factDB.FindFactByName(name)
+			if foundFact != nil {
+				err := h.factDB.DelFact(name)
+				if err != nil {
+					h.simpleResponse(message, fmt.Sprintf("Error while deleting this fact (%v)", err))
+				} else {
+					h.simpleResponse(message, "Ok, I will forget this fact.")
+				}
+			} else {
+				h.simpleResponse(message, fmt.Sprintf("Sorry cannot find a fact with name _%v_", name))
+			}
 		case cmdlist:
 			factsList := h.factDB.ListFacts()
 			content := "Here is the facts I know:\n"
 			for _, f := range factsList {
-				content += fmt.Sprintf(">%v\n", f.Name)
+				content += fmt.Sprintf("\n>%v", f.Name)
+				if f.OnlyInChan != "" {
+					content += fmt.Sprintf(" _Channel <#%v> only_", f.OnlyInChan)
+				}
 			}
 			h.simpleResponse(message, content)
 		case cmdremind:

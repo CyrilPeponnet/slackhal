@@ -14,6 +14,7 @@ type factStorer interface {
 	ListFacts() []fact
 	NumberOfFacts() int
 	FindFact(message string) *fact
+	FindFactByName(name string) *fact
 }
 
 //Storm orm db
@@ -22,7 +23,9 @@ type stormDB struct {
 }
 
 func (s *stormDB) Connect(dbPath string) (err error) {
-	s.db, err = storm.Open(dbPath)
+	if s.db == nil {
+		s.db, err = storm.Open(dbPath)
+	}
 	return err
 }
 
@@ -43,10 +46,10 @@ func (s *stormDB) ListFacts() (factlist []fact) {
 func (s *stormDB) DelFact(name string) (err error) {
 	var f fact
 	err = s.db.One("Name", name, &f)
-	if err != nil {
-		s.db.DeleteStruct(&f)
+	if err == nil {
+		err = s.db.DeleteStruct(&f)
 	}
-	return
+	return err
 }
 
 func (s *stormDB) FindFact(message string) *fact {
@@ -62,4 +65,13 @@ func (s *stormDB) FindFact(message string) *fact {
 		}
 	}
 	return nil
+}
+
+func (s *stormDB) FindFactByName(name string) *fact {
+	var f fact
+	err := s.db.One("Name", name, &f)
+	if err != nil {
+		return nil
+	}
+	return &f
 }
