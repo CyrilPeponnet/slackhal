@@ -1,52 +1,65 @@
 package pluginfacts
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/asdine/storm"
+)
 
 // factStorer interface
 type factStorer interface {
-	AddFact(*fact)
-	DelFact(name string)
-	ListFacts() []string
+	Connect(string) error
+	AddFact(*fact) error
+	DelFact(name string) error
+	ListFacts() []fact
 	NumberOfFacts() int
-	FindFact(message string) string
+	FindFact(message string) *fact
 }
 
-// Simple store in an array
-type inMemStore struct {
-	facts []*fact
+//Storm orm db
+type stormDB struct {
+	db *storm.DB
 }
 
-func (s *inMemStore) AddFact(f *fact) {
-	s.facts = append(s.facts, f)
+func (s *stormDB) Connect(dbPath string) (err error) {
+	s.db, err = storm.Open(dbPath)
+	return err
 }
 
-func (s *inMemStore) NumberOfFacts() int {
-	return len(s.facts)
+func (s *stormDB) AddFact(f *fact) (err error) {
+	return s.db.Save(f)
 }
 
-func (s *inMemStore) ListFacts() (factlist []string) {
-	for _, f := range s.facts {
-		factlist = append(factlist, f.Name)
+func (s *stormDB) NumberOfFacts() int {
+	n, _ := s.db.Count(&fact{})
+	return n
+}
+
+func (s *stormDB) ListFacts() (factlist []fact) {
+	s.db.All(&factlist)
+	return
+}
+
+func (s *stormDB) DelFact(name string) (err error) {
+	var f fact
+	err = s.db.One("Name", name, &f)
+	if err != nil {
+		s.db.DeleteStruct(&f)
 	}
-	return factlist
+	return
 }
 
-func (s *inMemStore) DelFact(name string) {
-	for i, f := range s.facts {
-		if f.Name == name {
-			s.facts = append(s.facts[:i], s.facts[i+1:]...)
-			return
-		}
-	}
-}
-
-func (s *inMemStore) FindFact(message string) string {
-	for _, f := range s.facts {
-		for _, p := range f.Patterns {
-			if strings.Contains(message, p) {
-				return f.Content
+func (s *stormDB) FindFact(message string) *fact {
+	var factList []fact
+	err := s.db.All(&factList)
+	if err == nil {
+		for _, f := range factList {
+			for _, p := range f.Patterns {
+				if strings.Contains(message, p) {
+					return &f
+				}
 			}
 		}
 	}
-	return ""
+	return nil
 }

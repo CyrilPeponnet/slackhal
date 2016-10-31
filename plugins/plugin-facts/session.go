@@ -2,6 +2,7 @@ package pluginfacts
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -19,9 +20,10 @@ const (
 
 // fact struct
 type fact struct {
-	Name     string
-	Patterns []string
-	Content  string
+	Name       string `storm:"id"`
+	Patterns   []string
+	Content    string
+	OnlyInChan string
 }
 
 // Chatentries struct
@@ -48,8 +50,14 @@ func (f *learn) New(message slack.Msg) string {
 		}
 	}
 	currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
-	// detect extra options like restrict to a channel, use classifier, content type (go template etc..)
-	f.entries = append(f.entries, &learningFact{Channel: message.Channel, User: message.User, Fact: fact{Name: currentFact}, State: Content})
+	// detect extra options like restrict to a channel, use classifier, content type (go template etc..), mention...
+	channel := ""
+	r, _ := regexp.Compile("chanlock")
+	if r.MatchString(currentFact) {
+		channel = message.Channel
+		currentFact = r.ReplaceAllString(currentFact, "")
+	}
+	f.entries = append(f.entries, &learningFact{Channel: message.Channel, User: message.User, Fact: fact{Name: currentFact, OnlyInChan: channel}, State: Content})
 	return fmt.Sprintf("Ok <@%v> let's do that! Can you define _%v_? \n(type stop-learning to stop this learning session)", message.User, currentFact)
 }
 
