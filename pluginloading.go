@@ -26,12 +26,10 @@ Loading:
 		Log.WithField("prefix", "[main]").Infof(" - %v version %v", meta.Name, meta.Version)
 		p.Init(Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name)), output)
 		// Register handlers if any
-		if meta.HTTPHandler != nil {
+		for route, handler := range meta.HTTPHandler {
 			handlers = true
-			for route, handler := range meta.HTTPHandler {
-				Log.WithField("prefix", "[main]").Infof("  -> Registering HTTP handler for %v", route.Name)
-				http.Handle(route.Name, handler)
-			}
+			Log.WithField("prefix", "[main]").Infof("  -> Registering HTTP handler for %v", route.Name)
+			http.Handle(route.Name, handler)
 		}
 	}
 
