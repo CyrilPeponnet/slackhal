@@ -236,7 +236,7 @@ Only call the plugin when mentionned or withing a DM conversation.
 
 ## Response channel
 
-The response channel `output` will take `*SlackResponse` strucs like:
+The response channel `output` will take `*SlackResponse` struct like:
 
 ```go
 // SlackResponse struct
@@ -250,7 +250,7 @@ type SlackResponse struct {
 Be sure to set the `Channel field` (you can take it from `message.Channel`).
 
 	If you set a `userID` as a channel, it will find for your proper DM `Channel` before sending for you.
-	If you set a channel as a string with a leadign `#`, it will try to resolve it to the good channel id.
+	If you set a channel as a string with a leading `#`, it will try to resolve it to the good channel id.
 
 The `Text` field follow the basic message formatting rules defined [here](https://api.slack.com/docs/message-formatting).
 
