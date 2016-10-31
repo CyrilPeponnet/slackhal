@@ -9,6 +9,7 @@ import (
 	"github.com/docopt/docopt-go"
 	"github.com/nlopes/slack"
 	_ "github.com/slackhal/plugins/builtins"
+	_ "github.com/slackhal/plugins/plugin-facts"
 	_ "github.com/slackhal/plugins/plugin-github"
 	_ "github.com/slackhal/plugins/plugin-jira"
 )
