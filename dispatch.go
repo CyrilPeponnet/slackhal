@@ -43,11 +43,23 @@ func DispatchResponses(output chan *plugin.SlackResponse, rtm *slack.RTM, api *s
 	}
 }
 
+// checkForCommand will try to detect a comamnd in a message
+// It will tokenise the message (split by splace) for that.
+func checkForCommand(text string, command string) bool {
+	for _, word := range strings.Split(text, " ") {
+		if word == command {
+			return true
+		}
+	}
+	return false
+}
+
 // DispatchMessage to plugins
 func DispatchMessage(prefix string, msg *slack.Msg) {
 	mentionned := strings.HasPrefix(msg.Channel, "D") || strings.Contains(msg.Text, fmt.Sprintf("<@%v>", bot.ID))
 
 	// Process active triggers
+loop:
 	for _, p := range plugin.PluginManager.Plugins {
 		info := p.GetMetadata()
 		if info.Disabled {
@@ -58,12 +70,14 @@ func DispatchMessage(prefix string, msg *slack.Msg) {
 				// Look for !action
 				if strings.Contains(msg.Text, prefix+c.Name) ||
 					// Look for @bot action
-					(strings.HasPrefix(msg.Text, fmt.Sprintf("<@%v> ", bot.ID)) && strings.Contains(msg.Text, c.Name)) ||
+					(strings.HasPrefix(msg.Text, fmt.Sprintf("<@%v> ", bot.ID)) && checkForCommand(msg.Text, c.Name)) ||
 					// Look for DM with action
 					(strings.HasPrefix(msg.Channel, "D") && strings.Contains(msg.Text, c.Name)) {
 					// Check if the user have permissions to use this plugin.
 					Log.WithFields(logrus.Fields{"prefix": "[main]", "Command": c.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
 					p.ProcessMessage([]string{c.Name}, *msg)
+					// don't process others
+					continue loop
 				}
 			}
 		}
@@ -79,8 +93,8 @@ func DispatchMessage(prefix string, msg *slack.Msg) {
 					if len(matches) > 0 {
 						Log.WithFields(logrus.Fields{"prefix": "[main]", "Trigger": r.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
 						p.ProcessMessage(matches, *msg)
+						continue loop
 					}
-
 				}
 			}
 		}
