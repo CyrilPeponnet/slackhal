@@ -17,7 +17,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	jiralib "github.com/andygrunwald/go-jira"
+	"github.com/andygrunwald/go-jira"
+	"github.com/fsnotify/fsnotify"
 	"github.com/nlopes/slack"
 	"github.com/slackhal/plugin"
 	"github.com/spf13/viper"
@@ -27,10 +28,17 @@ import (
 type Jira struct {
 	plugin.Metadata
 	Logger                  *logrus.Entry
-	JiraClient              *jiralib.Client
+	JiraClient              *jira.Client
 	url, username, password string
 	sink                    chan<- *plugin.SlackResponse
 	configuration           *viper.Viper
+	projects                []Project
+}
+
+// Project struct
+type Project struct {
+	Name     string
+	Channels []string
 }
 
 // Init interface implementation if you need to init things
@@ -42,15 +50,68 @@ func (h *Jira) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
 	h.configuration.AddConfigPath(".")
 	h.configuration.SetConfigName("plugin-jira")
 	h.configuration.SetConfigType("yaml")
+	h.ReloadConfiguration()
+
+	// Handle live reload
+	h.configuration.WatchConfig()
+	h.configuration.OnConfigChange(func(e fsnotify.Event) {
+		h.Logger.Info("Reloading jira configuration file.")
+		h.ReloadConfiguration()
+	})
+
+	h.url = h.configuration.GetString("Server.url")
+	h.username = h.configuration.GetString("Server.username")
+	h.password = h.configuration.GetString("Server.password")
+	h.JiraClient, _ = jira.NewClient(nil, h.url)
+
+	// Jira webhook handler
+	s := newEventHandler()
+	h.HTTPHandler[plugin.Command{Name: "/jira", ShortDescription: "Jira issue event hook.", LongDescription: "Will trap new issue created and send a notification to channels."}] = s
+
+	// Runloop to process incoming events
+	go func() {
+		for {
+			select {
+			case event := <-s.IssueEvents:
+				for _, msg := range h.ProcessIssueEvent(event) {
+					h.sink <- msg
+				}
+			}
+		}
+	}()
+
+}
+
+// ProcessIssueEvent from webhooks
+func (h *Jira) ProcessIssueEvent(event *jiraEvent) (responses []*plugin.SlackResponse) {
+	// Extract project name
+	project := event.Issue.Fields.Project.Name
+	for _, p := range h.projects {
+		if p.Name == project {
+			for _, c := range p.Channels {
+				o := new(plugin.SlackResponse)
+				o.Channel = c
+				o.Params = &slack.PostMessageParameters{
+					Username: "Jira",
+					IconURL:  "http://support.zendesk.com/api/v2/apps/4/assets/logo.png",
+				}
+				o.Params.Attachments = append(o.Params.Attachments, h.CreateAttachement(&event.Issue))
+				responses = append(responses, o)
+			}
+
+		}
+	}
+	return responses
+}
+
+// ReloadConfiguration reload the configuration on changes
+func (h *Jira) ReloadConfiguration() {
 	err := h.configuration.ReadInConfig()
 	if err != nil {
 		h.Logger.Errorf("Not able to read configuration for jira plugin. (%v)", err)
 	} else {
-		h.url = h.configuration.GetString("server.url")
-		h.username = h.configuration.GetString("server.username")
-		h.password = h.configuration.GetString("server.password")
+		h.configuration.UnmarshalKey("Notify", &h.projects)
 	}
-	h.JiraClient, _ = jiralib.NewClient(nil, h.url)
 }
 
 // Self interface implementation
@@ -75,7 +136,7 @@ func colorForStatus(status string) (color string) {
 }
 
 // CreateAttachement from a give issue.
-func (h *Jira) CreateAttachement(issue *jiralib.Issue) (attachement slack.Attachment) {
+func (h *Jira) CreateAttachement(issue *jira.Issue) (attachement slack.Attachment) {
 	var components []string
 	for _, component := range issue.Fields.Components {
 		components = append(components, component.Name)
@@ -83,10 +144,14 @@ func (h *Jira) CreateAttachement(issue *jiralib.Issue) (attachement slack.Attach
 	var days int
 	t, _ := time.Parse("2006-01-02T15:04:05.000-0700", issue.Fields.Created)
 	days = int(time.Since(t).Hours() / 24)
+	timeText := fmt.Sprintf("%v days ago, %v", days, issue.Fields.Reporter.DisplayName)
+	if days == 0 {
+		timeText = fmt.Sprintf("%v just", issue.Fields.Reporter.DisplayName)
+	}
 
 	attachement = slack.Attachment{
 		Fallback: fmt.Sprintf("%v - %v (%v)", issue.Key, issue.Fields.Summary, issue.Fields.Status.Name),
-		Pretext:  fmt.Sprintf("%v days ago, %v reported this issue (%v comments):", days, issue.Fields.Reporter.DisplayName, len(issue.Fields.Comments.Comments)),
+		Pretext:  fmt.Sprintf("%v reported this issue (%v comments):", timeText, len(issue.Fields.Comments.Comments)),
 		Text:     fmt.Sprintf("*[%v]* <%v/browse/%v|%v>: *%v*", strings.ToUpper(issue.Fields.Status.Name), h.url, issue.Key, issue.Key, issue.Fields.Summary),
 		Fields: []slack.AttachmentField{
 			// slack.AttachmentField{
