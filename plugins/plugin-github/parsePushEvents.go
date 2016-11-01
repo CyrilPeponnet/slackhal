@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
+	"github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
 	"github.com/google/go-github/github"
 	"github.com/nlopes/slack"
 )
