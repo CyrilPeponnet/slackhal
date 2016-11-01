@@ -1,4 +1,4 @@
-# SLACKAHL - Yet another slack bot in golang.
+# SLACKHAL - Yet another slack bot in golang.
 
 ## TODO
 
