@@ -1,6 +1,6 @@
 ## Github plugin
 
-You will need to add a configuraiton file named `plugin-github.yaml` with the following structure
+You will need to add a configuraiton file named `plugin-github.yaml` with the following structure:
 
 ```
 Repositories:
@@ -17,6 +17,7 @@ The `Branches` contains the list of branches to follow, you must set at least on
 
 The `Channels` contains the list of slack channel to send the message to.
 
+The plugin handler the autoreload of the configuration file upon changes.
 
 For all of this to work you will need to define a webhook service in your Repository in github like:
 

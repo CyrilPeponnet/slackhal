@@ -1,10 +1,5 @@
 # SLACKHAL - Yet another slack bot in golang.
 
-## TODO
-
-[] permission plugin
-[] logger plugin - we need to find a UI for that.
-
 ## Usage
 
 ```
@@ -41,7 +36,7 @@ bot:
 
 ## Internal plugins
 
-You plugin must implement the following interfaces:
+Your plugin must implement the following interfaces:
 
 ```go
 Init(Logger *logrus.Entry, output chan<- *SlackResponse)
@@ -84,7 +79,7 @@ Then implement `Self` as:
 
 ```go
 // Self interface implementation
-func (h *cat) Self() (i interface{}) {
+func (h *Jira) Self()  interface{} {
 	return h
 }
 ```
@@ -125,15 +120,19 @@ func init() {
 
 This is where you will initialize the `plugin.Metadata` struct and add your commands / triggers. It must end with a call to `plugin.PluginManager.Register()` function call to load you plugin.
 
+*NOTE:* You should not use this function to init your plugin, this is only meant for registration process. Use the `Init` function for that.
+
 ### Package consideration
 
-If you are not creating your plugin under the `buitin` package you will need to update `slackhal.go` to import your module like:
+If you are not creating your plugin under the `builtins` package you will need to update `slackhal.go` to import your module like:
 
 ```go
 _ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
 ```
 
 where `pluginjira` is the subfolder where your parckage is stored.
+
+__TODO: Maybe we could use go-generate for that__
 
 ### Example:
 
@@ -175,6 +174,10 @@ func (h *echo) ProcessMessage(commands []string, message slack.Msg) {
 			h.sink <- o
 		}
 	}
+}
+
+func (h *echo) Self() interface{}{
+	//Nothing
 }
 
 // init function that will register your plugin to the plugin manager
@@ -230,9 +233,20 @@ Define a command like `help`. The bot will look for either:
 
 Will parse every message to find a match using the POSIX regexp. If you want to mach all message just put `.*`
 
+### HTTP Handlers
+
+You can add a HTTP Handler by defining:
+
+```
+s := newEventHandler()
+h.HTTPHandler[plugin.Command{Name: "/jira", ShortDescription: "Jira issue event hook.", LongDescription: "Will trap new issue created and send a notification to channels."}] = s
+```
+
+You handler must implement the [http.Handler interface](https://golang.org/pkg/net/http/#Handler).
+
 ### WhenMentionned
 
-Only call the plugin when mentionned or withing a DM conversation.
+Only call the plugin when mentionned or within a DM conversation.
 
 ## Response channel
 
@@ -249,8 +263,8 @@ type SlackResponse struct {
 
 Be sure to set the `Channel field` (you can take it from `message.Channel`).
 
-	If you set a `userID` as a channel, it will find for your proper DM `Channel` before sending for you.
-	If you set a channel as a string with a leading `#`, it will try to resolve it to the good channel id.
+- If you set a `userID` as a channel, it will find for your proper DM `Channel` before sending for you.
+- If you set a channel as a string with a leading `#`, it will try to resolve it to the good channel id.
 
 The `Text` field follow the basic message formatting rules defined [here](https://api.slack.com/docs/message-formatting).
 

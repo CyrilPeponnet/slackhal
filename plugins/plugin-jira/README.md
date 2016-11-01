@@ -21,3 +21,5 @@ Notify:
       - chan1
       - chan2
 ```
+
+The plugin handler the autoreload of the configuration file upon changes.
