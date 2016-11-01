@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
 )
 
 // cat struct define your plugin

@@ -3,15 +3,15 @@ package main
 import (
 	"github.com/fatih/color"
 
-	"github.com/slackhal/plugin"
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/spf13/viper"
 
+	_ "github.com/CyrilPeponnet/slackhal/plugins/builtins"
+	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-facts"
+	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-github"
+	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
 	"github.com/docopt/docopt-go"
 	"github.com/nlopes/slack"
-	_ "github.com/slackhal/plugins/builtins"
-	_ "github.com/slackhal/plugins/plugin-facts"
-	_ "github.com/slackhal/plugins/plugin-github"
-	_ "github.com/slackhal/plugins/plugin-jira"
 )
 
 // Bot info

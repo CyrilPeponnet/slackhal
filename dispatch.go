@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
 )
 
 // DispatchResponses will process reponses from the channel

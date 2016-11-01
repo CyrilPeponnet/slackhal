@@ -5,10 +5,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/google/go-github/github"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
-	"github.com/slackhal/plugins/plugin-jira"
 )
 
 // ProcessPushEvents will transform an event into a slack message.

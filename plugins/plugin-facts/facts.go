@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
 	"github.com/spf13/viper"
 )
 

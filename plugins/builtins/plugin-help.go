@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
 )
 
 // help struct define your plugin

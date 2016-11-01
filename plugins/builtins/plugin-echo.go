@@ -3,9 +3,9 @@ package builtins
 import (
 	"strings"
 
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
 )
 
 // echo struct define your plugin

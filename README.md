@@ -130,7 +130,7 @@ This is where you will initialize the `plugin.Metadata` struct and add your comm
 If you are not creating your plugin under the `buitin` package you will need to update `slackhal.go` to import your module like:
 
 ```go
-_ "github.com/slackhal/plugins/plugin-jira"
+_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
 ```
 
 where `pluginjira` is the subfolder where your parckage is stored.
@@ -145,7 +145,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
+	"github.com/CyrilPeponnet/slackhal/plugin"
 )
 
 // echo struct define your plugin

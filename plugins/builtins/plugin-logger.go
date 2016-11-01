@@ -1,9 +1,9 @@
 package builtins
 
 import (
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
 )
 
 // logger struct define your plugin

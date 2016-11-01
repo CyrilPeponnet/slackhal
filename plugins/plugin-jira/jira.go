@@ -16,11 +16,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/Sirupsen/logrus"
 	"github.com/andygrunwald/go-jira"
 	"github.com/fsnotify/fsnotify"
 	"github.com/nlopes/slack"
-	"github.com/slackhal/plugin"
 	"github.com/spf13/viper"
 )
 

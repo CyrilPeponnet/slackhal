@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/slackhal/plugin"
+	"github.com/CyrilPeponnet/slackhal/plugin"
 )
 
 func initPLugins(disabledPlugins []string, output chan<- *plugin.SlackResponse) {
