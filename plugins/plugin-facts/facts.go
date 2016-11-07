@@ -77,6 +77,14 @@ func (h *facts) ProcessMessage(commands []string, message slack.Msg) {
 				msg := fmt.Sprintf("Found a fact for _%v_\n", name)
 				msg += fmt.Sprintf("Current content is: \n>_%v_\n", foundFact.Content)
 				msg += fmt.Sprintf("Currents patterns are\n> _%v_\n", strings.Join(foundFact.Patterns, " || "))
+				channels := "all"
+				if len(foundFact.RestrictToChannelsID) > 0 {
+					channels = ""
+					for _, rc := range foundFact.RestrictToChannelsID {
+						channels += fmt.Sprintf("<#%v> ", rc)
+					}
+				}
+				msg += fmt.Sprintf("Current channel scope is \n> _%v_\n", channels)
 				msg += "Relearning this fact now!"
 				h.simpleResponse(message, msg)
 				// HACK to learn a known fact
@@ -103,25 +111,42 @@ func (h *facts) ProcessMessage(commands []string, message slack.Msg) {
 			content := "Here is the facts I know:\n"
 			for _, f := range factsList {
 				content += fmt.Sprintf("\n>%v", f.Name)
-				if f.OnlyInChan != "" {
-					content += fmt.Sprintf(" _Channel <#%v> only_", f.OnlyInChan)
+				channels := "all channels"
+				if len(f.RestrictToChannelsID) > 0 {
+					channels = ""
+					for _, rc := range f.RestrictToChannelsID {
+						channels += fmt.Sprintf("<#%v> ", rc)
+					}
 				}
+				content += fmt.Sprintf(" _Channel scope %v_", channels)
 			}
 			h.simpleResponse(message, content)
 		case cmdremind:
 			mentionned := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdremind)+len(cmdremind) : len(message.Text)])
 			foundFact := h.factDB.FindFact(message.Text)
 			if foundFact != nil {
-				if (foundFact.OnlyInChan == "" || foundFact.OnlyInChan == message.Channel) && foundFact.Content != "" {
-					h.simpleResponse(message, mentionned+"\n"+foundFact.Content)
+				if !allowedChan(foundFact, message) {
+					h.simpleResponse(message, fmt.Sprintf("Sorry <@%v>, this fact is not allowed in that channel.", message.User))
+
+				} else {
+					if foundFact.Content != "" {
+						h.simpleResponse(message, mentionned+"\n"+foundFact.Content)
+					}
 				}
 			}
 		default:
 			foundFact := h.factDB.FindFact(message.Text)
 			if foundFact != nil {
-				if (foundFact.OnlyInChan == "" || foundFact.OnlyInChan == message.Channel) && foundFact.Content != "" {
-					h.simpleResponse(message, fmt.Sprintf("<@%v>: %v", message.User, foundFact.Content))
+				if !allowedChan(foundFact, message) {
+					h.simpleResponse(message, fmt.Sprintf("Sorry <@%v>, this fact is not allowed in that channel.", message.User))
+
+				} else {
+					if foundFact.Content != "" {
+						h.simpleResponse(message, fmt.Sprintf("<@%v>: %v", message.User, foundFact.Content))
+					}
+
 				}
+
 			}
 			// continue learning if any
 			f, r := h.learner.Learn(message)
@@ -130,8 +155,24 @@ func (h *facts) ProcessMessage(commands []string, message slack.Msg) {
 				h.factDB.AddFact(&f)
 				h.simpleResponse(message, fmt.Sprintf("I now know %v facts.", h.factDB.NumberOfFacts()))
 			}
+
 		}
 	}
+}
+
+// allowedChan return if we are in an allowed chan
+func allowedChan(f *fact, m slack.Msg) bool {
+	if len(f.RestrictToChannelsID) > 0 {
+		for _, rc := range f.RestrictToChannelsID {
+			if rc == m.Channel {
+				return true
+			}
+		}
+	} else {
+		return true
+	}
+
+	return false
 }
 
 // Self interface implementation
@@ -143,7 +184,7 @@ func (h *facts) Self() (i interface{}) {
 const (
 	cmdnew    = "new-fact"
 	cmdcancel = "stop-learning"
-	cmdlist   = "list-fact"
+	cmdlist   = "list-facts"
 	cmdedit   = "edit-fact"
 	cmddel    = "remove-fact"
 	cmdremind = "tell-fact"

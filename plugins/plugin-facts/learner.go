@@ -14,16 +14,16 @@ const (
 	Pattern = 1
 	// Content const
 	Content = 2
-	// Done const
-	Done = 3
+	// Scope const
+	Scope = 3
 )
 
 // fact struct
 type fact struct {
-	Name       string `storm:"id"`
-	Patterns   []string
-	Content    string
-	OnlyInChan string
+	Name                 string `storm:"id"`
+	Patterns             []string
+	Content              string
+	RestrictToChannelsID []string
 }
 
 // Chatentries struct
@@ -50,14 +50,7 @@ func (f *learn) New(message slack.Msg) string {
 		}
 	}
 	currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
-	// detect extra options like restrict to a channel, use classifier, content type (go template etc..), mention...
-	channel := ""
-	r, _ := regexp.Compile("channel:lock")
-	if r.MatchString(currentFact) {
-		channel = message.Channel
-		currentFact = strings.TrimSpace(r.ReplaceAllString(currentFact, ""))
-	}
-	f.entries = append(f.entries, &learningFact{Channel: message.Channel, User: message.User, Fact: fact{Name: currentFact, OnlyInChan: channel}, State: Content})
+	f.entries = append(f.entries, &learningFact{Channel: message.Channel, User: message.User, Fact: fact{Name: currentFact, RestrictToChannelsID: []string{}}, State: Content})
 	return fmt.Sprintf("Ok <@%v> let's do that! Can you define _%v_? \n(type stop-learning to stop this learning session)", message.User, currentFact)
 }
 
@@ -91,6 +84,15 @@ func (f *learn) Learn(message slack.Msg) (fact fact, response string) {
 				patterns := strings.TrimSpace(message.Text)
 				for _, pattern := range strings.Split(patterns, "||") {
 					e.Fact.Patterns = append(e.Fact.Patterns, strings.TrimSpace(pattern))
+				}
+				e.State = Scope
+				return fact, fmt.Sprintf("One last things <@%v>, in which channel(s) should I check those patterns? (all or #chan1 #chan2...)", message.User)
+			case Scope:
+				if strings.ToLower(message.Text) != "all" {
+					re := regexp.MustCompile(`<#(\S+)+\|\S+>`)
+					for _, m := range re.FindAllStringSubmatch(message.Text, -1) {
+						e.Fact.RestrictToChannelsID = append(e.Fact.RestrictToChannelsID, m[1])
+					}
 				}
 				fact = e.Fact
 				f.entries = append(f.entries[:i], f.entries[i+1:]...)
