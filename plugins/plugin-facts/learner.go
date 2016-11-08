@@ -86,7 +86,7 @@ func (f *learn) Learn(message slack.Msg) (fact fact, response string) {
 					e.Fact.Patterns = append(e.Fact.Patterns, strings.TrimSpace(pattern))
 				}
 				e.State = Scope
-				return fact, fmt.Sprintf("One last things <@%v>, in which channel(s) should I check those patterns? (all or #chan1 #chan2...)", message.User)
+				return fact, fmt.Sprintf("One last thing <@%v>, in which channel(s) should I check those patterns? (all or #chan1 #chan2...)", message.User)
 			case Scope:
 				if strings.ToLower(message.Text) != "all" {
 					re := regexp.MustCompile(`<#(\S+)+\|\S+>`)
