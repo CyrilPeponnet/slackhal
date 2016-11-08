@@ -81,6 +81,9 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 
 	Log.Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do")
 
+	// Init our plugins
+	initPLugins(disabledPlugins, output)
+
 Loop:
 	for {
 		select {
@@ -97,8 +100,6 @@ Loop:
 				bot.ID = info.User.ID
 				Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
 				Log.WithField("prefix", "[main]").Debugf("with id %v", bot.ID)
-				// Init our plugins
-				initPLugins(disabledPlugins, output)
 				// Start our Response dispatching run loop
 				go DispatchResponses(output, rtm, api)
 
@@ -128,7 +129,7 @@ Loop:
 				// experimental and not used
 
 			case *slack.LatencyReport:
-				Log.WithField("prefix", "[main]").Debugf("Current latency: %v", ev.Value)
+				// Log.WithField("prefix", "[main]").Debugf("Current latency: %v", ev.Value)
 
 			case *slack.RTMError:
 				Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())
@@ -136,6 +137,9 @@ Loop:
 			case *slack.InvalidAuthEvent:
 				Log.WithField("prefix", "[main]").Error("Invalid credentials provided!")
 				break Loop
+
+			case *slack.AckMessage:
+				// ACK from rtm send event.
 
 			default:
 				// ingore other events
