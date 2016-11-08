@@ -36,7 +36,7 @@ Options:
 	-f, --file confing		 The configuration file to load [default ./slackhal.yml]
 	-p, --plugins-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char           The char used to detect direct commands [default: !].
-	--handler port			 The Port of the http handler [default: :8080].
+	--http-handler-port port			 The Port of the http handler [default: :8080].
 	-l, --log level          Set the log level [default: error].
 `
 	color.Blue(` __ _            _                _
@@ -44,7 +44,7 @@ Options:
 \ \| |/ _  |/ __| |/ // /_/ / _  | |
 _\ \ | (_| | (__|   </ __  / (_| | |
 \__/_|\__,_|\___|_|\_\/ /_/ \__,_|_|
-                                    `)
+                         Version 1.0`)
 
 	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
 	disabledPlugins := []string{}
@@ -61,7 +61,7 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 		args["--token"] = viper.GetString("bot.token")
 		args["--log"] = viper.GetString("bot.log.level")
 		args["--trigger"] = viper.GetString("bot.trigger")
-		args["--handler"] = viper.GetString("bot.handler")
+		args["--http-handler-port"] = viper.GetString("bot.httpHandlerPort")
 		disabledPlugins = viper.GetStringSlice("bot.plugins.disabled")
 	}
 
@@ -79,10 +79,10 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 	// output channels and start the runloop
 	output := make(chan *plugin.SlackResponse)
 
-	Log.Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do")
+	Log.Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do...")
 
 	// Init our plugins
-	initPLugins(disabledPlugins, output)
+	initPLugins(disabledPlugins, args["--http-handler-port"].(string), output)
 
 Loop:
 	for {

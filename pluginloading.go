@@ -8,7 +8,7 @@ import (
 	"github.com/CyrilPeponnet/slackhal/plugin"
 )
 
-func initPLugins(disabledPlugins []string, output chan<- *plugin.SlackResponse) {
+func initPLugins(disabledPlugins []string, httpPort string, output chan<- *plugin.SlackResponse) {
 	// Loading our plugin and Init them
 	handlers := false
 	Log.WithField("prefix", "[main]").Infof("Plugins %v are disabled", strings.Join(disabledPlugins, ", "))
@@ -35,7 +35,7 @@ Loading:
 
 	// Start the http handler if we have some handlers registered.
 	if handlers {
-		Log.WithField("prefix", "[main]").Info("HTTP Handler Started")
-		go func() { Log.Fatal(http.ListenAndServe(":8080", nil)) }()
+		Log.WithField("prefix", "[main]").Infof("HTTP Handler Started on port %v", httpPort)
+		go func() { Log.Fatal(http.ListenAndServe(httpPort, nil)) }()
 	}
 }

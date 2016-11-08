@@ -11,7 +11,7 @@ Options:
 	-f, --file confing		 The configuration file to load [default ./slackhal.yml]
 	-p, --plugins-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char           The char used to detect direct commands [default: !].
-	--handler port			 The Port of the http handler [default: :8080].
+	--http-handler-port port The Port of the http handler [default: :8080].
 	-l, --log level          Set the log level [default: error].
 ```
 
@@ -23,7 +23,7 @@ Example of yaml configuration file:
 bot:
   token: "yourtoken"
   trigger: "!"
-  handler: "":8080"
+  httpHandlerPort: ":8080"
   log:
     level: debug
   plugins:
