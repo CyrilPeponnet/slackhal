@@ -30,8 +30,10 @@ func (h *echo) ProcessMessage(commands []string, message slack.Msg) {
 	for _, c := range commands {
 		if c == "echo" {
 			o := new(plugin.SlackResponse)
-			o.Text = strings.Replace(message.Text, c+" ", "", 1)
+			o.Text = message.Text[strings.Index(message.Text, c)+len(c)+1 : len(message.Text)]
 			o.Channel = message.Channel
+			// This is a test to implement tracking of message
+			o.TrackerID = 42
 			h.sink <- o
 		}
 	}

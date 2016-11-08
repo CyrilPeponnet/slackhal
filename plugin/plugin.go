@@ -45,9 +45,11 @@ func NewMetadata(name string) (m Metadata) {
 
 // SlackResponse struct
 type SlackResponse struct {
-	Channel string
-	Text    string
-	Params  *slack.PostMessageParameters
+	Channel    string
+	TrackerID  int
+	TrackedTTL int
+	Text       string
+	Params     *slack.PostMessageParameters
 }
 
 // Plugin Interface

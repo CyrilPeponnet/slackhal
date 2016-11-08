@@ -34,7 +34,9 @@ bot:
 
 # Plugins
 
-## Internal plugins
+You can take a look at the builtins plugins to understand how it works.
+
+## Plugins implementation
 
 Your plugin must implement the following interfaces:
 
@@ -255,16 +257,21 @@ The response channel `output` will take `*SlackResponse` struct like:
 ```go
 // SlackResponse struct
 type SlackResponse struct {
-	Channel string
-	Text      string
-	Params    *slack.PostMessageParameters
+	Channel    string
+	TrackerID  int
+	TrackedTTL int
+	Text       string
+	Params     *slack.PostMessageParameters
 }
+
 ```
 
 Be sure to set the `Channel field` (you can take it from `message.Channel`).
 
 - If you set a `userID` as a channel, it will find for your proper DM `Channel` before sending for you.
 - If you set a channel as a string with a leading `#`, it will try to resolve it to the good channel id.
+
+The `TrackerID` is used if you want to edit sent message later. Your plugin must set the `trackerID` with a positive integer that will be used as an identifier to edit the message later. The `TrackedTTL` field is used to set a TTL of tracking. If you send two `SlackResponse` with the same `TrackerID`, it will edit the message instead of posting a new one. As of today you can only update the Text as the other parameters are not handled for now (https://github.com/nlopes/slack/pull/93).
 
 The `Text` field follow the basic message formatting rules defined [here](https://api.slack.com/docs/message-formatting).
 

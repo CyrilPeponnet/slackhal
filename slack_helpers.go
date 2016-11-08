@@ -25,7 +25,7 @@ func FindChannelByName(rtm *slack.RTM, name string) (id string) {
 }
 
 // FindUserChannel - Find a IM channel by username
-func FindUserChannel(api *slack.Client, user string) (id string) {
+func FindUserChannel(rtm *slack.RTM, user string) (id string) {
 	if cachedUsers == nil {
 		cachedUsers = map[string]string{}
 	}
@@ -34,7 +34,7 @@ func FindUserChannel(api *slack.Client, user string) (id string) {
 		return i
 	}
 	// Rebuild the cache
-	chans, _ := api.GetIMChannels()
+	chans, _ := rtm.GetIMChannels()
 	for _, ch := range chans {
 		cachedUsers[ch.User] = ch.ID
 		if ch.User == user {

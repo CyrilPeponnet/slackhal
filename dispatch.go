@@ -11,12 +11,12 @@ import (
 )
 
 // DispatchResponses will process reponses from the channel
-func DispatchResponses(output chan *plugin.SlackResponse, rtm *slack.RTM, api *slack.Client) {
+func DispatchResponses(output chan *plugin.SlackResponse, rtm *slack.RTM) {
 	for {
 		select {
 		case msg := <-output:
 			if strings.HasPrefix(msg.Channel, "U") {
-				msg.Channel = FindUserChannel(api, msg.Channel)
+				msg.Channel = FindUserChannel(rtm, msg.Channel)
 			} else if strings.HasPrefix(msg.Channel, "#") {
 				msg.Channel = FindChannelByName(rtm, msg.Channel[1:len(msg.Channel)])
 			}
@@ -26,17 +26,54 @@ func DispatchResponses(output chan *plugin.SlackResponse, rtm *slack.RTM, api *s
 			case msg.Channel == "":
 				Log.Warnf("No channel found for message %v", msg)
 			case msg.Params != nil:
-				c, t, e := api.PostMessage(msg.Channel, msg.Text, *msg.Params)
-				if e != nil {
-					Log.Errorf("Error while sending message %v", e)
+				// Use PostMessage when there is attachments
+				if msg.TrackerID != 0 && tracker.GetTimeStampFor(msg.TrackerID) != "" {
+					ts := tracker.GetTimeStampFor(msg.TrackerID)
+					// TODO: The library is not yet handling Attachments update
+					// So we are only updating the Text
+					c, t, _, e := rtm.UpdateMessage(msg.Channel, ts, msg.Text)
+					if e != nil {
+						Log.Errorf("Error while updating message %v", e)
+					} else {
+						Log.Debugf("Updated message %v to %v at %v", msg.Text, c, t)
+						// Update the tracker
+						tracker.Track(Tracker{TrackerID: msg.TrackerID, TimeStamp: ts, TTL: 300})
+					}
 				} else {
-					Log.Debugf("Sent message %v to %v at %v", msg.Text, c, t)
+					// Else post message
+					c, t, e := rtm.PostMessage(msg.Channel, msg.Text, *msg.Params)
+					if e != nil {
+						Log.Errorf("Error while sending message %v", e)
+					} else {
+						Log.Debugf("Sent message %v to %v at %v", msg.Text, c, t)
+						// If the message need to be tracked
+						if msg.TrackerID != 0 && tracker.GetTimeStampFor(msg.TrackerID) == "" {
+							tracker.Track(Tracker{TrackerID: msg.TrackerID, TimeStamp: t, TTL: 300})
+						}
+					}
 				}
 
 			default:
-				msg := slack.OutgoingMessage{Channel: msg.Channel, Text: msg.Text, Type: "message"}
-				rtm.SendMessage(&msg)
-				Log.Debugf("Sent message %v", msg)
+				// Use RTM for  as default
+				tosend := slack.OutgoingMessage{Channel: msg.Channel, Text: msg.Text, Type: "message"}
+				if msg.TrackerID != 0 {
+					ts := tracker.GetTimeStampFor(msg.TrackerID)
+					if ts == "" {
+						ttl := 300
+						if msg.TrackedTTL != 0 {
+							ttl = msg.TrackedTTL
+						}
+						tracker.Track(Tracker{TrackerID: msg.TrackerID, TTL: ttl})
+						tosend.ID = msg.TrackerID
+					} else {
+						rtm.UpdateMessage(tosend.Channel, ts, tosend.Text)
+						Log.Debugf("Updated message %v", tosend.Text)
+						continue
+					}
+				}
+				rtm.SendMessage(&tosend)
+				Log.Debugf("Sent message %v", tosend)
+
 			}
 
 		}

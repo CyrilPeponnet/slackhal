@@ -22,6 +22,9 @@ type botInfo struct {
 
 var bot botInfo
 
+// This is the message tracker
+var tracker TrackerManager
+
 func main() {
 	headline := "Slack HAL bot."
 	usage := `
@@ -84,14 +87,17 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 	// Init our plugins
 	initPLugins(disabledPlugins, args["--http-handler-port"].(string), output)
 
+	// Initialize our message tracker
+	tracker.Init()
+
+	// Start our Response dispatching run loop
+	go DispatchResponses(output, rtm)
+
 Loop:
 	for {
 		select {
 		case msg := <-rtm.IncomingEvents:
 			switch ev := msg.Data.(type) {
-
-			case *slack.HelloEvent:
-				// Ignore hello
 
 			case *slack.ConnectedEvent:
 				// Log.WithFields(logrus.Fields{"prefix": "[main]", "Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
@@ -100,11 +106,9 @@ Loop:
 				bot.ID = info.User.ID
 				Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
 				Log.WithField("prefix", "[main]").Debugf("with id %v", bot.ID)
-				// Start our Response dispatching run loop
-				go DispatchResponses(output, rtm, api)
 
 			case *slack.MessageEvent:
-				Log.WithField("prefix", "[main]").Debugf("Message: %+v", ev)
+				Log.WithField("prefix", "[main]").Debugf("Message received: %+v", ev)
 				// Discard messages comming from myself or bots
 				if ev.User == bot.ID {
 					continue
@@ -115,6 +119,19 @@ Loop:
 					}
 				}
 				go DispatchMessage(args["--trigger"].(string), &ev.Msg)
+
+			case *slack.AckMessage:
+				tracker.UpdateTracking(ev)
+
+			case *slack.RTMError:
+				Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())
+
+			case *slack.InvalidAuthEvent:
+				Log.WithField("prefix", "[main]").Error("Invalid credentials provided!")
+				break Loop
+
+			case *slack.HelloEvent:
+				// Ignore hello
 
 			case *slack.PresenceChangeEvent:
 				// Log.WithField("prefix", "[main]").Debug("Presence Change: %v", ev)
@@ -130,16 +147,6 @@ Loop:
 
 			case *slack.LatencyReport:
 				// Log.WithField("prefix", "[main]").Debugf("Current latency: %v", ev.Value)
-
-			case *slack.RTMError:
-				Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())
-
-			case *slack.InvalidAuthEvent:
-				Log.WithField("prefix", "[main]").Error("Invalid credentials provided!")
-				break Loop
-
-			case *slack.AckMessage:
-				// ACK from rtm send event.
 
 			default:
 				// ingore other events
