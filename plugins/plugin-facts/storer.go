@@ -30,6 +30,9 @@ func (s *stormDB) Connect(dbPath string) (err error) {
 }
 
 func (s *stormDB) AddFact(f *fact) (err error) {
+	// HACK to allow url parsing as this is already parsed by slack
+	f.Content = strings.Replace(f.Content, "<", "", -1)
+	f.Content = strings.Replace(f.Content, ">", "", -1)
 	return s.db.Save(f)
 }
 

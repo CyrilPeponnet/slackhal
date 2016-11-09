@@ -21,10 +21,10 @@ func init() {
 	helper.Metadata = plugin.NewMetadata("help")
 	helper.Metadata.Description = "Helper plugin."
 	helper.ActiveTriggers = []plugin.Command{plugin.Command{Name: "help", ShortDescription: "Will provide some help :)"},
-		plugin.Command{Name: "list-plugins", ShortDescription: "List all enabled plugins"},
-		plugin.Command{Name: "list-commands", ShortDescription: "List all available commands"},
-		plugin.Command{Name: "list-handlers", ShortDescription: "List all available HTTP handlers"},
-		plugin.Command{Name: "list-triggers", ShortDescription: "List all passive triggers"}}
+		plugin.Command{Name: "list-plugins", ShortDescription: "List all enabled plugins."},
+		plugin.Command{Name: "list-commands", ShortDescription: "List all available commands."},
+		plugin.Command{Name: "list-handlers", ShortDescription: "List all available HTTP handlers."},
+		plugin.Command{Name: "list-triggers", ShortDescription: "List all passive triggers."}}
 	plugin.PluginManager.Register(helper)
 }
 
@@ -161,6 +161,7 @@ func PluginList() (o string) {
 // GetHelpForPlugin get help for a give plugin and commands
 func GetHelpForPlugin(matches []string) (o string) {
 	if matches[3] != "" || matches[2] != "" {
+	loop:
 		for _, p := range plugin.PluginManager.Plugins {
 			info := p.GetMetadata()
 			if info.Disabled {
@@ -171,6 +172,7 @@ func GetHelpForPlugin(matches []string) (o string) {
 				for _, c := range info.ActiveTriggers {
 					if c.Name == matches[3] {
 						o += fmt.Sprintf("> *%v*:\n```%v```\n", c.Name, c.LongDescription)
+						break loop
 					} else {
 
 						o += fmt.Sprintf("> *%v* - %v\n", c.Name, c.ShortDescription)

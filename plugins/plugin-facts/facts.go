@@ -67,6 +67,11 @@ func (h *facts) ProcessMessage(commands []string, message slack.Msg) {
 	for _, cmd := range commands {
 		switch cmd {
 		case cmdnew:
+			currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
+			if h.factDB.FindFactByName(currentFact) != nil {
+				h.simpleResponse(message, "I'm afraid I cannot do that. There is already a fact registered with that name.")
+				continue
+			}
 			h.simpleResponse(message, h.learner.New(message))
 		case cmdcancel:
 			h.simpleResponse(message, h.learner.Cancel(message))
@@ -137,14 +142,10 @@ func (h *facts) ProcessMessage(commands []string, message slack.Msg) {
 		default:
 			foundFact := h.factDB.FindFact(message.Text)
 			if foundFact != nil {
-				if !allowedChan(foundFact, message) {
-					h.simpleResponse(message, fmt.Sprintf("Sorry <@%v>, this fact is not allowed in that channel.", message.User))
-
-				} else {
+				if allowedChan(foundFact, message) {
 					if foundFact.Content != "" {
 						h.simpleResponse(message, fmt.Sprintf("<@%v>: %v", message.User, foundFact.Content))
 					}
-
 				}
 
 			}
@@ -196,12 +197,12 @@ func init() {
 	learner.Metadata = plugin.NewMetadata("facts")
 	learner.Description = "Logger messages"
 	learner.ActiveTriggers = []plugin.Command{
-		plugin.Command{Name: cmdnew, ShortDescription: "Start a learning session", LongDescription: "Will start a learning session to add new facts."},
-		plugin.Command{Name: cmdcancel, ShortDescription: "Stop a learning session", LongDescription: "Will stop a current learning session"},
-		plugin.Command{Name: cmdlist, ShortDescription: "List all learned facts", LongDescription: "Will list all the registered facts."},
-		plugin.Command{Name: cmdremind, ShortDescription: "Tell someone about a facit.", LongDescription: "Will metion a person with the content of a fact."},
-		plugin.Command{Name: cmdedit, ShortDescription: "Edit a given fact", LongDescription: "Allow you to edit registered facts."},
-		plugin.Command{Name: cmddel, ShortDescription: "Remove a give fact", LongDescription: "Allow you to remove a registered fact."}}
+		plugin.Command{Name: cmdnew, ShortDescription: "Start a learning session.", LongDescription: "Will start a learning session to add new facts."},
+		plugin.Command{Name: cmdcancel, ShortDescription: "Stop a learning session.", LongDescription: "Will stop a current learning session"},
+		plugin.Command{Name: cmdlist, ShortDescription: "List all learned facts.", LongDescription: "Will list all the registered facts."},
+		plugin.Command{Name: cmdremind, ShortDescription: "Tell someone about a fact.", LongDescription: "Will metion a person with the content of a fact."},
+		plugin.Command{Name: cmdedit, ShortDescription: "Edit a given fact.", LongDescription: "Allow you to edit registered facts."},
+		plugin.Command{Name: cmddel, ShortDescription: "Remove a give fact.", LongDescription: "Allow you to remove a registered fact."}}
 	learner.PassiveTriggers = []plugin.Command{plugin.Command{Name: `.*`, ShortDescription: "Look for facts", LongDescription: "Will look for registered facts to replay."}}
 	plugin.PluginManager.Register(learner)
 }

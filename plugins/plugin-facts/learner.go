@@ -50,6 +50,9 @@ func (f *learn) New(message slack.Msg) string {
 		}
 	}
 	currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
+	if currentFact == "" {
+		return "Can you please provide a non empty string? Aborting leaning process... Consul `!help fact`"
+	}
 	f.entries = append(f.entries, &learningFact{Channel: message.Channel, User: message.User, Fact: fact{Name: currentFact, RestrictToChannelsID: []string{}}, State: Content})
 	return fmt.Sprintf("Ok <@%v> let's do that! Can you define _%v_? \n(type stop-learning to stop this learning session)", message.User, currentFact)
 }
@@ -86,12 +89,16 @@ func (f *learn) Learn(message slack.Msg) (fact fact, response string) {
 					e.Fact.Patterns = append(e.Fact.Patterns, strings.TrimSpace(pattern))
 				}
 				e.State = Scope
-				return fact, fmt.Sprintf("One last thing <@%v>, in which channel(s) should I check those patterns? (all or #chan1 #chan2...)", message.User)
+				return fact, fmt.Sprintf("One last thing <@%v>, in which channel(s) should I check those patterns? (all, here or #chan1 #chan2...)", message.User)
 			case Scope:
 				if strings.ToLower(message.Text) != "all" {
-					re := regexp.MustCompile(`<#(\S+)+\|\S+>`)
-					for _, m := range re.FindAllStringSubmatch(message.Text, -1) {
-						e.Fact.RestrictToChannelsID = append(e.Fact.RestrictToChannelsID, m[1])
+					if strings.ToLower(message.Text) == "here" {
+						e.Fact.RestrictToChannelsID = append(e.Fact.RestrictToChannelsID, message.Channel)
+					} else {
+						re := regexp.MustCompile(`<#(\S+)+\|\S+>`)
+						for _, m := range re.FindAllStringSubmatch(message.Text, -1) {
+							e.Fact.RestrictToChannelsID = append(e.Fact.RestrictToChannelsID, m[1])
+						}
 					}
 				}
 				fact = e.Fact
