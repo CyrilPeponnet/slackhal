@@ -202,8 +202,8 @@ func (h *Jira) ProcessMessage(commands []string, message slack.Msg) {
 
 		for _, c := range commands {
 			// Strip the leading #
-			c = c[1:len(c)]
-			issue, _, _ := h.JiraClient.Issue.Get(strings.ToUpper(c))
+			c = strings.ToUpper(c[1:len(c)])
+			issue, _, _ := h.JiraClient.Issue.Get(c)
 			if issue != nil {
 				o.Params.Attachments = append(o.Params.Attachments, h.CreateAttachement(issue))
 			} else {
