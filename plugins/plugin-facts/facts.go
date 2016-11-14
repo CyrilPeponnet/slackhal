@@ -203,6 +203,6 @@ func init() {
 		plugin.Command{Name: cmdremind, ShortDescription: "Tell someone about a fact.", LongDescription: "Will metion a person with the content of a fact."},
 		plugin.Command{Name: cmdedit, ShortDescription: "Edit a given fact.", LongDescription: "Allow you to edit registered facts."},
 		plugin.Command{Name: cmddel, ShortDescription: "Remove a give fact.", LongDescription: "Allow you to remove a registered fact."}}
-	learner.PassiveTriggers = []plugin.Command{plugin.Command{Name: `.*`, ShortDescription: "Look for facts", LongDescription: "Will look for registered facts to replay."}}
+	learner.PassiveTriggers = []plugin.Command{plugin.Command{Name: `(?s:.*)`, ShortDescription: "Look for facts", LongDescription: "Will look for registered facts to replay."}}
 	plugin.PluginManager.Register(learner)
 }

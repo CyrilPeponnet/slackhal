@@ -38,6 +38,6 @@ func init() {
 	loggerer := new(logger)
 	loggerer.Metadata = plugin.NewMetadata("logger")
 	loggerer.Description = "Logger messages"
-	loggerer.PassiveTriggers = []plugin.Command{plugin.Command{Name: `.*`, ShortDescription: "Log everything", LongDescription: "Will intercept all messages to log them."}}
+	loggerer.PassiveTriggers = []plugin.Command{plugin.Command{Name: `(?s:.*)`, ShortDescription: "Log everything", LongDescription: "Will intercept all messages to log them."}}
 	plugin.PluginManager.Register(loggerer)
 }
