@@ -86,7 +86,7 @@ func (f *learn) Learn(message slack.Msg) (fact fact, response string) {
 				// Store the patterns and remove the learning session
 				patterns := strings.TrimSpace(message.Text)
 				for _, pattern := range strings.Split(patterns, "||") {
-					e.Fact.Patterns = append(e.Fact.Patterns, strings.TrimSpace(pattern))
+					e.Fact.Patterns = append(e.Fact.Patterns, strings.ToLower(strings.TrimSpace(pattern)))
 				}
 				e.State = Scope
 				return fact, fmt.Sprintf("One last thing <@%v>, in which channel(s) should I check those patterns? (all, here or #chan1 #chan2...)", message.User)

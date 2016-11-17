@@ -61,7 +61,12 @@ func (s *stormDB) FindFact(message string) *fact {
 	if err == nil {
 		for _, f := range factList {
 			for _, p := range f.Patterns {
-				if strings.Contains(message, p) {
+				//TODO: Not really optmized.
+				m := strings.ToLower(message)
+				if p == m ||
+					strings.HasPrefix(m, p) ||
+					strings.HasSuffix(m, p) ||
+					strings.Contains(m, " "+p+" ") {
 					return &f
 				}
 			}
