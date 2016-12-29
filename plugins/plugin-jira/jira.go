@@ -183,13 +183,8 @@ func (h *Jira) CreateAttachement(issue *jira.Issue) (attachement slack.Attachmen
 
 // ProcessMessage interface implementation
 func (h *Jira) ProcessMessage(commands []string, message slack.Msg) {
-	// Send a premessage because we can
+	// Process our entries
 	o := new(plugin.SlackResponse)
-	o.Text = fmt.Sprintf("<@%v>, I think you are refering to:", message.User)
-	o.Channel = message.Channel
-	h.sink <- o
-	// Now process our entries
-	o = new(plugin.SlackResponse)
 	o.Channel = message.Channel
 	if !h.Connect() {
 		o.Text = fmt.Sprintf("Sorry <@%v>, I'm having hard time to reach your jira instance. Please check my logs.", message.User)
@@ -203,19 +198,20 @@ func (h *Jira) ProcessMessage(commands []string, message slack.Msg) {
 		for _, c := range commands {
 			// Strip the leading #
 			c = strings.ToUpper(c[1:len(c)])
-			issue, _, _ := h.JiraClient.Issue.Get(c)
+			issue, _, err := h.JiraClient.Issue.Get(c)
+			if err != nil {
+				h.Logger.Debug("An error occurs while fetching an issue ", err)
+				continue
+			}
 			if issue != nil {
 				o.Params.Attachments = append(o.Params.Attachments, h.CreateAttachement(issue))
-			} else {
-				attachement := slack.Attachment{
-					Fallback: fmt.Sprintf("Sorry %s doesn't seens to be a valid jira issue.", c),
-					Pretext:  fmt.Sprintf("Sorry %s doesn't seens to be a valid jira issue.", c),
-				}
-				o.Params.Attachments = append(o.Params.Attachments, attachement)
 			}
 		}
 	}
-	h.sink <- o
+	if len(o.Params.Attachments) > 0 {
+		h.sink <- o
+	}
+	h.JiraClient.Authentication.Logout()
 }
 
 // init function that will register your plugin to the plugin manager
