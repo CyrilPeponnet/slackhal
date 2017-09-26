@@ -43,7 +43,7 @@ type Project struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *Jira) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
+func (h *Jira) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.Logger = Logger
 	h.sink = output
 	h.configuration = viper.New()

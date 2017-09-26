@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 
 	_ "github.com/CyrilPeponnet/slackhal/plugins/builtins"
+	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-archiver"
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-facts"
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-github"
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
@@ -14,16 +15,7 @@ import (
 	"github.com/nlopes/slack"
 )
 
-// Bot info
-type botInfo struct {
-	Name string
-	ID   string
-}
-
-var bot botInfo
-
-// This is the message tracker
-var tracker TrackerManager
+var bot plugin.Bot
 
 func main() {
 	headline := "Slack HAL bot."
@@ -36,7 +28,7 @@ Usage: slackhal [options] [--plugin-path path...]
 Options:
 	-h, --help               Show this help.
 	-t, --token token        The slack bot token to use.
-	-f, --file confing		 The configuration file to load [default ./slackhal.yml]
+	-f, --file config		 The configuration file to load [default ./slackhal.yml]
 	-p, --plugins-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char           The char used to detect direct commands [default: !].
 	--http-handler-port port			 The Port of the http handler [default: :8080].
@@ -75,9 +67,9 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 		Log.Fatal("You need to set the slack bot token!")
 	}
 
-	api := slack.New(args["--token"].(string))
-	rtm := api.NewRTM()
-	go rtm.ManageConnection()
+	bot.API = slack.New(args["--token"].(string))
+	bot.RTM = bot.API.NewRTM()
+	go bot.RTM.ManageConnection()
 
 	// output channels and start the runloop
 	output := make(chan *plugin.SlackResponse)
@@ -85,27 +77,29 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 	Log.Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do...")
 
 	// Init our plugins
-	initPLugins(disabledPlugins, args["--http-handler-port"].(string), output)
+	initPLugins(disabledPlugins, args["--http-handler-port"].(string), output, &bot)
 
 	// Initialize our message tracker
-	tracker.Init()
+	bot.Tracker.Init()
 
 	// Start our Response dispatching run loop
-	go DispatchResponses(output, rtm)
+	go DispatchResponses(output, &bot)
 
 Loop:
 	for {
 		select {
-		case msg := <-rtm.IncomingEvents:
+		case msg := <-bot.RTM.IncomingEvents:
 			switch ev := msg.Data.(type) {
 
 			case *slack.ConnectedEvent:
 				// Log.WithFields(logrus.Fields{"prefix": "[main]", "Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
-				info := rtm.GetInfo()
+				info := bot.RTM.GetInfo()
 				bot.Name = info.User.Name
 				bot.ID = info.User.ID
 				Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
 				Log.WithField("prefix", "[main]").Debugf("with id %v", bot.ID)
+				Log.WithField("prefix", "[main]").Debug("Warming up caches for group and users.")
+				bot.WarmUpCaches()
 
 			case *slack.MessageEvent:
 				Log.WithField("prefix", "[main]").Debugf("Message received: %+v", ev)
@@ -113,7 +107,7 @@ Loop:
 				if ev.User == bot.ID {
 					continue
 				}
-				for _, bot := range rtm.GetInfo().Bots {
+				for _, bot := range bot.RTM.GetInfo().Bots {
 					if ev.BotID == bot.ID {
 						continue Loop
 					}
@@ -121,7 +115,7 @@ Loop:
 				go DispatchMessage(args["--trigger"].(string), &ev.Msg)
 
 			case *slack.AckMessage:
-				tracker.UpdateTracking(ev)
+				bot.Tracker.UpdateTracking(ev)
 
 			case *slack.RTMError:
 				Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())

@@ -157,7 +157,7 @@ type echo struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *echo) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
+func (h *echo) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.sink = output
 }
 

@@ -22,7 +22,7 @@ type facts struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *facts) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
+func (h *facts) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.Logger = Logger
 	h.sink = output
 	h.learner = new(learn)
@@ -59,6 +59,7 @@ func (h *facts) simpleResponse(message slack.Msg, text string) {
 	r := new(plugin.SlackResponse)
 	r.Channel = message.Channel
 	r.Text = text
+	r.Params = &slack.PostMessageParameters{UnfurlLinks: true, AsUser: true}
 	h.sink <- r
 }
 

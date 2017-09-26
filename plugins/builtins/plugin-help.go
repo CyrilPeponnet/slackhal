@@ -30,7 +30,7 @@ func init() {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *help) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
+func (h *help) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.sink = output
 }
 

@@ -8,10 +8,12 @@ import (
 	"github.com/CyrilPeponnet/slackhal/plugin"
 )
 
-func initPLugins(disabledPlugins []string, httpPort string, output chan<- *plugin.SlackResponse) {
+func initPLugins(disabledPlugins []string, httpPort string, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	// Loading our plugin and Init them
 	handlers := false
-	Log.WithField("prefix", "[main]").Infof("Plugins %v are disabled", strings.Join(disabledPlugins, ", "))
+	if len(disabledPlugins) != 0 {
+		Log.WithField("prefix", "[main]").Infof("Plugins %v are disabled", strings.Join(disabledPlugins, ", "))
+	}
 	Log.WithField("prefix", "[main]").Info("Loading plugins")
 
 Loading:
@@ -24,7 +26,7 @@ Loading:
 			}
 		}
 		Log.WithField("prefix", "[main]").Infof(" - %v version %v", meta.Name, meta.Version)
-		p.Init(Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name)), output)
+		p.Init(Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name)), output, bot)
 		// Register handlers if any
 		for route, handler := range meta.HTTPHandler {
 			handlers = true

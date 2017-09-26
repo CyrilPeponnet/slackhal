@@ -18,7 +18,7 @@ type cat struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *cat) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse) {
+func (h *cat) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	// cats are initless
 	h.sink = output
 }

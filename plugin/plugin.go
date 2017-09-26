@@ -54,7 +54,7 @@ type SlackResponse struct {
 
 // Plugin Interface
 type Plugin interface {
-	Init(Logger *logrus.Entry, output chan<- *SlackResponse)
+	Init(Logger *logrus.Entry, output chan<- *SlackResponse, bot *Bot)
 	GetMetadata() *Metadata
 	ProcessMessage(commands []string, message slack.Msg)
 	Self() interface{}
