@@ -86,15 +86,29 @@ func (h *archiver) GetMetadata() *plugin.Metadata {
 
 // ProcessMessage interface implementation
 func (h *archiver) ProcessMessage(commands []string, message slack.Msg) {
+	channel := message.Channel
+	name := h.bot.GetNameFromID(message.Channel)
+	public := true
+	if strings.HasPrefix(channel, "G") {
+		public = false
+	}
+	// If there is a command check if a channel is provided as arg.
+	// If so then override the vars above
+	if len(commands) > 0 {
+		re := regexp.MustCompile(`.*<(\S+\|\S+)>`)
+		for _, sub := range re.FindAllStringSubmatch(message.Text, -1) {
+			if string(sub[1][0]) == "#" {
+				channel = strings.Split(string(sub[1]), "|")[0]
+				// remove leading #
+				channel = channel[1:len(channel)]
+				name = strings.Split(string(sub[1]), "|")[1]
+			}
+		}
+	}
 	for _, cmd := range commands {
 		switch cmd {
 		case cmdlog:
-			name := h.bot.GetNameFromID(message.Channel)
-			public := true
-			if strings.HasPrefix(message.Channel, "G") {
-				public = false
-			}
-			ch := GetChannelFromDB(h.DB, h.ChatBot.ID, name, message.Channel, public)
+			ch := GetChannelFromDB(h.DB, h.ChatBot.ID, name, channel, public)
 			if ch.Status != chanActive {
 				h.DB.Model(&ch).Update("status", chanActive)
 				h.simpleResponse(message, "Ok I will start logging again activities on that channel.")
@@ -104,12 +118,7 @@ func (h *archiver) ProcessMessage(commands []string, message slack.Msg) {
 			h.DB.Find(&h.Channels)
 
 		case cmdnolog:
-			name := h.bot.GetNameFromID(message.Channel)
-			public := true
-			if strings.HasPrefix(message.Channel, "G") {
-				public = false
-			}
-			ch := GetChannelFromDB(h.DB, h.ChatBot.ID, name, message.Channel, public)
+			ch := GetChannelFromDB(h.DB, h.ChatBot.ID, name, channel, public)
 			if ch.Status != chanArchived {
 				h.DB.Model(&ch).Update("status", chanArchived)
 				h.simpleResponse(message, "Ok I will stop logging activities on that channel.")
@@ -122,7 +131,8 @@ func (h *archiver) ProcessMessage(commands []string, message slack.Msg) {
 		case cmdarchive:
 			msg := "This channel doesn't have any archives."
 			for _, ch := range h.Channels {
-				if ch.Slug == message.Channel {
+				fmt.Printf("%v - %v", ch.Slug, channel)
+				if ch.Slug == channel {
 					url := "<" + h.URL + "/" + h.ChatBot.Slug + "/" + ch.Slug + "|archive link>"
 					l := "logging"
 					if ch.Status != chanActive {
@@ -136,11 +146,11 @@ func (h *archiver) ProcessMessage(commands []string, message slack.Msg) {
 		default:
 			// Check if the channel accept logging
 			for _, ch := range h.Channels {
-				if ch.Slug == message.Channel && ch.Status == chanActive {
+				if ch.Slug == channel && ch.Status == chanActive {
 					if message.User == "" {
 						break
 					}
-					name := h.bot.GetNameFromID(message.User)
+					username := h.bot.GetNameFromID(message.User)
 					// Replace channel and user id by their names
 					re := regexp.MustCompile(`<(\S+)>`)
 					for _, sub := range re.FindAllStringSubmatch(message.Text, -1) {
@@ -152,7 +162,7 @@ func (h *archiver) ProcessMessage(commands []string, message slack.Msg) {
 							message.Text = strings.Replace(message.Text, sub[0], "#"+strings.Split(sub[1], "|")[1], -1)
 						}
 					}
-					NewLogToDB(h.DB, h.ChatBot.ID, ch.ID, name, message.Text)
+					NewLogToDB(h.DB, h.ChatBot.ID, ch.ID, username, message.Text)
 					break
 				}
 			}

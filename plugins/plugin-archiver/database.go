@@ -82,9 +82,7 @@ func GetChannelFromDB(db *gorm.DB, id int, name string, slug string, public bool
 		c.Kudos = false
 		c.Name = name
 		c.Slug = slug
-		if !public {
-			c.PrivateSlug = slug
-		}
+		c.PrivateSlug = slug
 		c.Status = chanActive
 		db.Save(&c)
 	}
