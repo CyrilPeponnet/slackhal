@@ -8,8 +8,8 @@ RUN cd /go/bin && go build github.com/CyrilPeponnet/slackhal
 # final stage
 FROM alpine
 WORKDIR /slackhal
-COPY --from=build-env /go/bin/slackhal /slackhal/
+COPY --from=build-env /go/bin/slackhal /usr/bin/slackhal
 
 VOLUME /slackhal/
 
-ENTRYPOINT ./slackhal
+ENTRYPOINT ["slackhal"]

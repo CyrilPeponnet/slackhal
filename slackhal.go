@@ -28,10 +28,10 @@ Usage: slackhal [options] [--plugin-path path...]
 Options:
 	-h, --help               Show this help.
 	-t, --token token        The slack bot token to use.
-	-f, --file config		 The configuration file to load [default ./slackhal.yml]
+	-f, --file config        The configuration file to load [default ./slackhal.yml]
 	-p, --plugins-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char           The char used to detect direct commands [default: !].
-	--http-handler-port port			 The Port of the http handler [default: :8080].
+	--http-handler-port port The Port of the http handler [default: :8080].
 	-l, --log level          Set the log level [default: error].
 `
 	color.Blue(` __ _            _                _
@@ -86,66 +86,63 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 	go DispatchResponses(output, &bot)
 
 Loop:
-	for {
-		select {
-		case msg := <-bot.RTM.IncomingEvents:
-			switch ev := msg.Data.(type) {
+	for msg := range bot.RTM.IncomingEvents {
+		switch ev := msg.Data.(type) {
 
-			case *slack.ConnectedEvent:
-				// Log.WithFields(logrus.Fields{"prefix": "[main]", "Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
-				info := bot.RTM.GetInfo()
-				bot.Name = info.User.Name
-				bot.ID = info.User.ID
-				Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
-				Log.WithField("prefix", "[main]").Debugf("with id %v", bot.ID)
-				Log.WithField("prefix", "[main]").Debug("Warming up caches for group and users.")
-				bot.WarmUpCaches()
+		case *slack.ConnectedEvent:
+			// Log.WithFields(logrus.Fields{"prefix": "[main]", "Infos": ev.Info, "counter": ev.ConnectionCount}).Debug("Connected with:")
+			info := bot.RTM.GetInfo()
+			bot.Name = info.User.Name
+			bot.ID = info.User.ID
+			Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
+			Log.WithField("prefix", "[main]").Debugf("with id %v", bot.ID)
+			Log.WithField("prefix", "[main]").Debug("Warming up caches for group and users.")
+			bot.WarmUpCaches()
 
-			case *slack.MessageEvent:
-				Log.WithField("prefix", "[main]").Debugf("Message received: %+v", ev)
-				// Discard messages comming from myself or bots
-				if ev.User == bot.ID {
-					continue
-				}
-				for _, bot := range bot.RTM.GetInfo().Bots {
-					if ev.BotID == bot.ID {
-						continue Loop
-					}
-				}
-				go DispatchMessage(args["--trigger"].(string), &ev.Msg)
-
-			case *slack.AckMessage:
-				bot.Tracker.UpdateTracking(ev)
-
-			case *slack.RTMError:
-				Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())
-
-			case *slack.InvalidAuthEvent:
-				Log.WithField("prefix", "[main]").Error("Invalid credentials provided!")
-				break Loop
-
-			case *slack.HelloEvent:
-				// Ignore hello
-
-			case *slack.PresenceChangeEvent:
-				// Log.WithField("prefix", "[main]").Debug("Presence Change: %v", ev)
-
-			case *slack.ChannelJoinedEvent:
-				// nothing
-
-			case *slack.ChannelLeftEvent:
-				// nothing
-
-			case *slack.ReconnectUrlEvent:
-				// experimental and not used
-
-			case *slack.LatencyReport:
-				// Log.WithField("prefix", "[main]").Debugf("Current latency: %v", ev.Value)
-
-			default:
-				// ingore other events
-				// Log.WithFields(logrus.Fields{"prefix": "[main]", "event": fmt.Sprintf("%+v", msg.Data), "type": fmt.Sprintf("%T", ev)}).Debug("Received:")
+		case *slack.MessageEvent:
+			Log.WithField("prefix", "[main]").Debugf("Message received: %+v", ev)
+			// Discard messages comming from myself or bots
+			if ev.User == bot.ID {
+				continue
 			}
+			for _, bot := range bot.RTM.GetInfo().Bots {
+				if ev.BotID == bot.ID {
+					continue Loop
+				}
+			}
+			go DispatchMessage(args["--trigger"].(string), &ev.Msg)
+
+		case *slack.AckMessage:
+			bot.Tracker.UpdateTracking(ev)
+
+		case *slack.RTMError:
+			Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())
+
+		case *slack.InvalidAuthEvent:
+			Log.WithField("prefix", "[main]").Error("Invalid credentials provided!")
+			break Loop
+
+		case *slack.HelloEvent:
+			// Ignore hello
+
+		case *slack.PresenceChangeEvent:
+			// Log.WithField("prefix", "[main]").Debug("Presence Change: %v", ev)
+
+		case *slack.ChannelJoinedEvent:
+			// nothing
+
+		case *slack.ChannelLeftEvent:
+			// nothing
+
+		case *slack.ReconnectUrlEvent:
+			// experimental and not used
+
+		case *slack.LatencyReport:
+			// Log.WithField("prefix", "[main]").Debugf("Current latency: %v", ev.Value)
+
+		default:
+			// ingore other events
+			// Log.WithFields(logrus.Fields{"prefix": "[main]", "event": fmt.Sprintf("%+v", msg.Data), "type": fmt.Sprintf("%T", ev)}).Debug("Received:")
 		}
 	}
 }

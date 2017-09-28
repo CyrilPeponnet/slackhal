@@ -60,12 +60,9 @@ func (h *githook) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse
 
 	// Runloop to process incoming events
 	go func() {
-		for {
-			select {
-			case event := <-s.PushEvents:
-				for _, msg := range h.ProcessPushEvents(event) {
-					h.sink <- msg
-				}
+		for event := range s.PushEvents {
+			for _, msg := range h.ProcessPushEvents(event) {
+				h.sink <- msg
 			}
 		}
 	}()

@@ -70,12 +70,9 @@ func (h *Jira) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, b
 
 	// Runloop to process incoming events
 	go func() {
-		for {
-			select {
-			case event := <-s.IssueEvents:
-				for _, msg := range h.ProcessIssueEvent(event) {
-					h.sink <- msg
-				}
+		for event := range s.IssueEvents {
+			for _, msg := range h.ProcessIssueEvent(event) {
+				h.sink <- msg
 			}
 		}
 	}()
@@ -110,7 +107,10 @@ func (h *Jira) ReloadConfiguration() {
 	if err != nil {
 		h.Logger.Errorf("Not able to read configuration for jira plugin. (%v)", err)
 	} else {
-		h.configuration.UnmarshalKey("Notify", &h.projects)
+		err = h.configuration.UnmarshalKey("Notify", &h.projects)
+		if err != nil {
+			h.Logger.Errorf("Error unmarshalling configuration: %v", err)
+		}
 	}
 }
 
@@ -211,7 +211,10 @@ func (h *Jira) ProcessMessage(commands []string, message slack.Msg) {
 	if len(o.Params.Attachments) > 0 {
 		h.sink <- o
 	}
-	h.JiraClient.Authentication.Logout()
+	err := h.JiraClient.Authentication.Logout()
+	if err != nil {
+		h.Logger.Errorf("Error while logging out: %v", err)
+	}
 }
 
 // init function that will register your plugin to the plugin manager
