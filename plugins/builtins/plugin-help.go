@@ -5,8 +5,8 @@ import (
 	"regexp"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
+	"github.com/sirupsen/logrus"
 )
 
 // help struct define your plugin

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 	// Load postgres handler
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/nlopes/slack"

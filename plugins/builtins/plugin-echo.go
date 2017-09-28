@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
+	"github.com/sirupsen/logrus"
 )
 
 // echo struct define your plugin

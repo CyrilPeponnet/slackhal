@@ -2,10 +2,10 @@ package githubplugin
 
 import (
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/Sirupsen/logrus"
 	"github.com/f2prateek/github-webhook-server"
 	"github.com/fsnotify/fsnotify"
 	"github.com/nlopes/slack"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 

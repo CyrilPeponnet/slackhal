@@ -144,7 +144,7 @@ package builtins
 import (
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/nlopes/slack"
 	"github.com/CyrilPeponnet/slackhal/plugin"
 )

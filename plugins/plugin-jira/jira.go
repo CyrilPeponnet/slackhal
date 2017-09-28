@@ -17,10 +17,10 @@ import (
 	"time"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/Sirupsen/logrus"
 	"github.com/andygrunwald/go-jira"
 	"github.com/fsnotify/fsnotify"
 	"github.com/nlopes/slack"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -197,8 +197,8 @@ func (h *Jira) ProcessMessage(commands []string, message slack.Msg) {
 
 		for _, c := range commands {
 			// Strip the leading #
-			c = strings.ToUpper(c[1:len(c)])
-			issue, _, err := h.JiraClient.Issue.Get(c)
+			c = strings.ToUpper(c[1:])
+			issue, _, err := h.JiraClient.Issue.Get(c, nil)
 			if err != nil {
 				h.Logger.Debug("An error occurs while fetching an issue ", err)
 				continue
@@ -227,7 +227,7 @@ func init() {
 func (h *Jira) Connect() bool {
 	if !h.JiraClient.Authentication.Authenticated() {
 		res, err := h.JiraClient.Authentication.AcquireSessionCookie(h.username, h.password)
-		if err != nil || res == false {
+		if err != nil || !res {
 			h.Logger.Errorf("Error while authenticating to jira (%v)", err)
 			return false
 		}

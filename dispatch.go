@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
+	"github.com/sirupsen/logrus"
 )
 
 // DispatchResponses will process reponses from the channel

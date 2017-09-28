@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
+	"github.com/sirupsen/logrus"
 )
 
 // cat struct define your plugin

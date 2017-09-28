@@ -50,7 +50,7 @@ func (h *githook) ProcessPushEvents(event *github.PushEvent) (messages []*plugin
 						// HACK: We are forcing the assertion here
 						if jc, found := jp.Self().(*jiraplugin.Jira); found {
 							if jc.Connect() {
-								issue, _, _ := jc.JiraClient.Issue.Get(strings.ToUpper(m[1:len(m)]))
+								issue, _, _ := jc.JiraClient.Issue.Get(strings.ToUpper(m[1:]), nil)
 								if issue != nil {
 									message.Params.Attachments = append(message.Params.Attachments, jc.CreateAttachement(issue))
 								}

@@ -1,10 +1,10 @@
-hash: aa6691f7e0d2bcdc2834b2cf1521f6605f7ba31d672f648220be04fc21920a5d
-updated: 2016-11-01T10:04:01.011008353-07:00
+hash: 69d9c30c9c588305861aae5331107710bed2a5451bd890746004f6a5d180c3d1
+updated: 2017-09-28T09:22:14.050155-07:00
 imports:
 - name: github.com/andygrunwald/go-jira
-  version: 5899a43d6afd0d3c9643c9917d37add78c7864d5
+  version: acbc88d59582a4885dbd82fd775caa7c15245171
 - name: github.com/asdine/storm
-  version: fc722d51650c78f96f62fbc03ae3518791df486c
+  version: 255212403bcca439778718edf5e2d3d50744eca3
   subpackages:
   - codec
   - codec/json
@@ -12,34 +12,27 @@ imports:
   - internal
   - q
 - name: github.com/boltdb/bolt
-  version: 4b1ebc1869ad66568b313d0dc410e2be72670dda
+  version: fa5367d20c994db73282594be0146ab221657943
 - name: github.com/docopt/docopt-go
   version: 784ddc588536785e7299f7272f39101f7faccc3f
-- name: github.com/emirpasic/gods
-  version: ec46b0116df083cba218abbf72522c6d0c065e4e
-  subpackages:
-  - containers
-  - trees
-  - trees/redblacktree
-  - utils
 - name: github.com/f2prateek/github-webhook-server
   version: 130bdca318f150c4d5610dba96708b53250b607a
 - name: github.com/fatih/color
-  version: dea9d3a26a087187530244679c1cfb3a42937794
+  version: 570b54cabe6b8eb0bc2dfce68d964677d63b5260
 - name: github.com/fatih/structs
-  version: dc3312cb1a4513a366c4c9e622ad55c32df12ed3
+  version: 7e5a8eef611ee84dd359503f3969f80df4c50723
 - name: github.com/fsnotify/fsnotify
   version: 629574ca2a5df945712d3079857300b5e4da0236
 - name: github.com/google/go-github
-  version: f7fcf6f52ff94adf1cc0ded41e7768d2ad729972
+  version: 511f540f1887d30b88cee4a2fcd1f2922754acf4
   subpackages:
   - github
 - name: github.com/google/go-querystring
-  version: 9235644dd9e52eeae6fa48efd539fdc351a0af53
+  version: 53e6ce116135b80d037921a7fdd5138cf32d7a8a
   subpackages:
   - query
 - name: github.com/hashicorp/hcl
-  version: 8fa153c5b4e9d1ccecda7075821ffc7c1f6d912b
+  version: 68e816d1c783414e79bc65b3994d9ab6b0a722ab
   subpackages:
   - hcl/ast
   - hcl/parser
@@ -49,69 +42,73 @@ imports:
   - json/parser
   - json/scanner
   - json/token
-- name: github.com/kr/fs
-  version: 2788f0dbd16903de03cb8186e5c7d97b69ad387b
+- name: github.com/jinzhu/gorm
+  version: 5174cc5c242a728b435ea2be8a2f7f998e15429b
+  subpackages:
+  - dialects/postgres
+- name: github.com/jinzhu/inflection
+  version: 1c35d901db3da928c72a72d8458480cc9ade058f
+- name: github.com/lib/pq
+  version: b77235e3890a962fe8a6f8c4c7198679ca7814e7
+  subpackages:
+  - hstore
+  - oid
 - name: github.com/magiconair/properties
-  version: 0723e352fa358f9322c938cc2dadda874e9151a9
+  version: 8d7837e64d3c1ee4e54a880c5a920ab4316fc90a
 - name: github.com/mattn/go-colorable
-  version: 6c903ff4aa50920ca86087a280590b36b3152b9c
+  version: 5411d3eea5978e6cdc258b30de592b60df6aba96
+  repo: https://github.com/mattn/go-colorable
 - name: github.com/mattn/go-isatty
-  version: 66b8e73f3f5cda9f96b69efd03dd3d7fc4a5cdb8
+  version: 57fdcb988a5c543893cc61bce354a6e24ab70022
+  repo: https://github.com/mattn/go-isatty
 - name: github.com/mgutz/ansi
-  version: c286dcecd19ff979eeb73ea444e479b903f2cfcb
+  version: 9520e82c474b0a04dd04f8a40959027271bab992
 - name: github.com/mitchellh/mapstructure
-  version: f3009df150dadf309fdee4a54ed65c124afad715
+  version: d0303fe809921458f417bcf828397a65db30a7e4
 - name: github.com/nlopes/slack
-  version: e595e9d8590a04ff76407e4e7d1791d25b095c66
-- name: github.com/pelletier/go-buffruneio
-  version: df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d
+  version: c86337c0ef2486a15edd804355d9c73d2f2caed1
 - name: github.com/pelletier/go-toml
-  version: 45932ad32dfdd20826f5671da37a5f3ce9f26a8d
-- name: github.com/pkg/errors
-  version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
-- name: github.com/pkg/sftp
-  version: 4d0e916071f68db74f8a73926335f809396d6b42
-- name: github.com/Sirupsen/logrus
-  version: 4b6ea7319e214d98c938f12692336f7ca9348d6b
+  version: 16398bac157da96aa88f98a2df640c7f32af1da2
+- name: github.com/sirupsen/logrus
+  version: f006c2ac4710855cf0f916dd6b77acf6b048dc6e
 - name: github.com/spf13/afero
-  version: 52e4a6cfac46163658bd4f123c49b6ee7dc75f78
+  version: ee1bd8ee15a1306d1f9201acc41ef39cd9f99a1b
   subpackages:
   - mem
-  - sftp
 - name: github.com/spf13/cast
-  version: 2580bc98dc0e62908119e4737030cc2fdfc45e4c
+  version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/jwalterweatherman
-  version: 33c24e77fb80341fe7130ee7c594256ff08ccc46
+  version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/pflag
-  version: 5ccb023bc27df288a957c5e994cd44fd19619465
+  version: 7aff26db30c1be810f9de5038ec5ef96ac41fd7c
 - name: github.com/spf13/viper
-  version: 651d9d916abc3c3d6a91a12549495caba5edffd2
+  version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
 - name: github.com/trivago/tgo
-  version: 2a8022165886997607ee91abc3b3383196cf27ec
+  version: e4d1ddd28c17dd89ed26327cf69fded22060671b
   subpackages:
   - tcontainer
+  - treflect
 - name: github.com/x-cray/logrus-prefixed-formatter
-  version: 78e945f7d6bfe5a81ce6121d92d8118e44303e58
+  version: bb2702d423886830dee131692131d35648c382e2
 - name: golang.org/x/crypto
-  version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
+  version: 76eec36fa14229c4b25bb894c2d0e591527af429
   subpackages:
-  - curve25519
-  - ed25519
-  - ed25519/internal/edwards25519
-  - ssh
+  - ssh/terminal
 - name: golang.org/x/net
-  version: 541150ac4f433e755f5663eba5d888c2fa347343
+  version: 0a9397675ba34b2845f758fe3cd68828369c6517
   subpackages:
   - websocket
 - name: golang.org/x/sys
-  version: c200b10b5d5e122be351b67af224adc6128af5bf
+  version: e24f485414aeafb646f6fca458b0bf869c0880a1
+  repo: https://go.googlesource.com/sys
   subpackages:
   - unix
+  - windows
 - name: golang.org/x/text
-  version: a8b38433e35b65ba247bb267317037dee1b70cea
+  version: 1cbadb444a806fd9430d14ad08967ed91da4fa0a
   subpackages:
   - transform
   - unicode/norm
 - name: gopkg.in/yaml.v2
-  version: a5b47d31c556af34a302ce5d659e6fea44d90de0
+  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
 testImports: []
