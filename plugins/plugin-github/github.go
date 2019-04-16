@@ -2,17 +2,17 @@ package githubplugin
 
 import (
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/f2prateek/github-webhook-server"
+	gws "github.com/f2prateek/github-webhook-server"
 	"github.com/fsnotify/fsnotify"
 	"github.com/nlopes/slack"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 // githook struct define your plugin
 type githook struct {
 	plugin.Metadata
-	Logger        *logrus.Entry
+	Logger        *zap.Logger
 	sink          chan<- *plugin.SlackResponse
 	repos         []Repository
 	configuration *viper.Viper
@@ -28,15 +28,17 @@ type Repository struct {
 func (h *githook) ReloadConfiguration() {
 	err := h.configuration.ReadInConfig()
 	if err != nil {
-		h.Logger.Errorf("Not able to read configuration for github plugin. (%v)", err)
+		h.Logger.Error("Not able to read configuration for github plugin.", zap.Error(err))
 	} else {
-		h.configuration.UnmarshalKey("Repositories", &h.repos)
+		if err := h.configuration.UnmarshalKey("Repositories", &h.repos); err != nil {
+			h.Logger.Error("Error while reading configuration", zap.Error(err))
+		}
 	}
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *githook) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *githook) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.Logger = Logger
 	h.sink = output
 	h.configuration = viper.New()
@@ -80,14 +82,14 @@ func (h *githook) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *githook) ProcessMessage(commands []string, message slack.Msg) {
+func (h *githook) ProcessMessage(command string, message slack.Msg) {
 	// Nothing to process
 }
 
 // init function that will register your plugin to the plugin manager
 func init() {
 	githooker := new(githook)
-	githooker.Metadata = plugin.NewMetadata("githook")
+	githooker.Metadata = plugin.NewMetadata("github")
 	githooker.Description = "Send github commit notification to channels."
 	plugin.PluginManager.Register(githooker)
 }

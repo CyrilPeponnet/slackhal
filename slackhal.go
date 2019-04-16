@@ -1,9 +1,15 @@
 package main
 
 import (
-	"github.com/fatih/color"
+	"fmt"
 
+	"go.uber.org/zap"
+
+	"github.com/CyrilPeponnet/slackhal/pkg/logutils"
 	"github.com/CyrilPeponnet/slackhal/plugin"
+	"github.com/docopt/docopt-go"
+	"github.com/fatih/color"
+	"github.com/nlopes/slack"
 	"github.com/spf13/viper"
 
 	_ "github.com/CyrilPeponnet/slackhal/plugins/builtins"
@@ -11,13 +17,13 @@ import (
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-facts"
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-github"
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
-	"github.com/docopt/docopt-go"
-	"github.com/nlopes/slack"
+	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-run"
 )
 
 var bot plugin.Bot
 
 func main() {
+
 	headline := "Slack HAL bot."
 	usage := `
 
@@ -29,52 +35,51 @@ Options:
 	-h, --help               Show this help.
 	-t, --token token        The slack bot token to use.
 	-f, --file config        The configuration file to load [default ./slackhal.yml]
-	-p, --plugins-path path  The paths to the plugins folder to load [default: ./plugins].
 	--trigger char           The char used to detect direct commands [default: !].
 	--http-handler-port port The Port of the http handler [default: :8080].
-	-l, --log level          Set the log level [default: error].
+	-l, --log-level level    Set the log level [default: error].
 `
 	color.Blue(` __ _            _                _
 / _\ | ____  ___| | __ /\  /\____| |
 \ \| |/ _  |/ __| |/ // /_/ / _  | |
 _\ \ | (_| | (__|   </ __  / (_| | |
 \__/_|\__,_|\___|_|\_\/ /_/ \__,_|_|
-                         Version 1.0`)
+                         Version 2.0`)
 
 	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
 	disabledPlugins := []string{}
 
-	// Load configuraiton file and override some args if needed.
+	// Load configuration file and override some args if needed.
 
 	if args["--file"] != nil {
 		viper.SetConfigFile(args["--file"].(string))
 		err := viper.ReadInConfig()
 		if err != nil {
-			Log.Errorf("Cannot read the provided configuration file: %v", err)
-			return
+			panic(fmt.Sprintf("Cannot read the provided configuration file: %v", err))
 		}
 		args["--token"] = viper.GetString("bot.token")
-		args["--log"] = viper.GetString("bot.log.level")
+		args["--log-level"] = viper.GetString("bot.log.level")
 		args["--trigger"] = viper.GetString("bot.trigger")
 		args["--http-handler-port"] = viper.GetString("bot.httpHandlerPort")
 		disabledPlugins = viper.GetStringSlice("bot.plugins.disabled")
 	}
 
-	setLogLevel(args["--log"].(string))
+	logutils.ConfigureWithOptions(args["--log-level"].(string), "console", "", false, false)
 
 	// Connect to slack and start runloop
 	if args["--token"] == nil {
-		Log.Fatal("You need to set the slack bot token!")
+		zap.L().Fatal("You need to set the slack bot token!")
 	}
 
 	bot.API = slack.New(args["--token"].(string))
 	bot.RTM = bot.API.NewRTM()
+
 	go bot.RTM.ManageConnection()
 
 	// output channels and start the runloop
 	output := make(chan *plugin.SlackResponse)
 
-	Log.Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do...")
+	zap.L().Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do...")
 
 	// Init our plugins
 	initPLugins(disabledPlugins, args["--http-handler-port"].(string), output, &bot)
@@ -87,6 +92,7 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 
 Loop:
 	for msg := range bot.RTM.IncomingEvents {
+
 		switch ev := msg.Data.(type) {
 
 		case *slack.ConnectedEvent:
@@ -94,14 +100,13 @@ Loop:
 			info := bot.RTM.GetInfo()
 			bot.Name = info.User.Name
 			bot.ID = info.User.ID
-			Log.WithField("prefix", "[main]").Infof("Connected as %v", bot.Name)
-			Log.WithField("prefix", "[main]").Debugf("with id %v", bot.ID)
-			Log.WithField("prefix", "[main]").Debug("Warming up caches for group and users.")
+			zap.L().Info("Connected", zap.String("name", bot.Name), zap.String("id", bot.ID))
+			zap.L().Debug("Warming up caches for group and users.")
 			bot.WarmUpCaches()
 
 		case *slack.MessageEvent:
-			Log.WithField("prefix", "[main]").Debugf("Message received: %+v", ev)
-			// Discard messages comming from myself or bots
+			zap.L().Debug("Message event received", zap.Reflect("event", ev))
+			// Discard messages coming from myself or bots
 			if ev.User == bot.ID {
 				continue
 			}
@@ -110,23 +115,24 @@ Loop:
 					continue Loop
 				}
 			}
-			go DispatchMessage(args["--trigger"].(string), &ev.Msg)
+
+			go DispatchMessage(args["--trigger"].(string), ev)
 
 		case *slack.AckMessage:
 			bot.Tracker.UpdateTracking(ev)
 
 		case *slack.RTMError:
-			Log.WithField("prefix", "[main]").Errorf("Error: %s\n", ev.Error())
+			zap.L().Error("RTM error", zap.String("error", ev.Error()))
 
 		case *slack.InvalidAuthEvent:
-			Log.WithField("prefix", "[main]").Error("Invalid credentials provided!")
+			zap.L().Error("Invalid credentials provided!")
 			break Loop
 
 		case *slack.HelloEvent:
 			// Ignore hello
 
 		case *slack.PresenceChangeEvent:
-			// Log.WithField("prefix", "[main]").Debug("Presence Change: %v", ev)
+			// zap.L().Debug("Presence Change: %v", ev)
 
 		case *slack.ChannelJoinedEvent:
 			// nothing
@@ -138,11 +144,11 @@ Loop:
 			// experimental and not used
 
 		case *slack.LatencyReport:
-			// Log.WithField("prefix", "[main]").Debugf("Current latency: %v", ev.Value)
+			// zap.L().Debugf("Current latency: %v", ev.Value)
 
 		default:
 			// ingore other events
-			// Log.WithFields(logrus.Fields{"prefix": "[main]", "event": fmt.Sprintf("%+v", msg.Data), "type": fmt.Sprintf("%T", ev)}).Debug("Received:")
+			zap.L().Debug("event", zap.Reflect("data", msg.Data))
 		}
 	}
 }

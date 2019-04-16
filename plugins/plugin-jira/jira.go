@@ -20,14 +20,14 @@ import (
 	"github.com/andygrunwald/go-jira"
 	"github.com/fsnotify/fsnotify"
 	"github.com/nlopes/slack"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 // Jira struct define your plugin
 type Jira struct {
 	plugin.Metadata
-	Logger                  *logrus.Entry
+	Logger                  *zap.Logger
 	JiraClient              *jira.Client
 	url, username, password string
 	sink                    chan<- *plugin.SlackResponse
@@ -43,7 +43,7 @@ type Project struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *Jira) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *Jira) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.Logger = Logger
 	h.sink = output
 	h.configuration = viper.New()
@@ -88,11 +88,11 @@ func (h *Jira) ProcessIssueEvent(event *jiraEvent) (responses []*plugin.SlackRes
 			for _, c := range p.Channels {
 				o := new(plugin.SlackResponse)
 				o.Channel = c
-				o.Params = &slack.PostMessageParameters{
+				o.Options = append(o.Options, slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{
 					Username: "Jira",
 					IconURL:  "http://support.zendesk.com/api/v2/apps/4/assets/logo.png",
-				}
-				o.Params.Attachments = append(o.Params.Attachments, h.CreateAttachement(&event.Issue))
+				}))
+				o.Options = append(o.Options, slack.MsgOptionAttachments(h.CreateAttachement(&event.Issue)))
 				responses = append(responses, o)
 			}
 
@@ -105,11 +105,11 @@ func (h *Jira) ProcessIssueEvent(event *jiraEvent) (responses []*plugin.SlackRes
 func (h *Jira) ReloadConfiguration() {
 	err := h.configuration.ReadInConfig()
 	if err != nil {
-		h.Logger.Errorf("Not able to read configuration for jira plugin. (%v)", err)
+		h.Logger.Error("Not able to read configuration for jira plugin. ", zap.Error(err))
 	} else {
 		err = h.configuration.UnmarshalKey("Notify", &h.projects)
 		if err != nil {
-			h.Logger.Errorf("Error unmarshalling configuration: %v", err)
+			h.Logger.Error("Error unmarshalling configuration", zap.Error(err))
 		}
 	}
 }
@@ -137,12 +137,13 @@ func colorForStatus(status string) (color string) {
 
 // CreateAttachement from a give issue.
 func (h *Jira) CreateAttachement(issue *jira.Issue) (attachement slack.Attachment) {
-	var components []string
-	for _, component := range issue.Fields.Components {
-		components = append(components, component.Name)
-	}
+
 	var days int
-	t, _ := time.Parse("2006-01-02T15:04:05.000-0700", issue.Fields.Created)
+	t, err := time.Parse("2006-01-02T15:04:05.999-0700", fmt.Sprint(issue.Fields.Created))
+	if err != nil {
+		t = time.Now()
+	}
+
 	days = int(time.Since(t).Hours() / 24)
 	timeText := fmt.Sprintf("%v days ago, %v", days, issue.Fields.Reporter.DisplayName)
 	if days == 0 {
@@ -178,42 +179,41 @@ func (h *Jira) CreateAttachement(issue *jira.Issue) (attachement slack.Attachmen
 		MarkdownIn: []string{"title", "text", "fields", "fallback"},
 		Color:      colorForStatus(issue.Fields.Status.Name),
 	}
-	return
+	return attachement
 }
 
 // ProcessMessage interface implementation
-func (h *Jira) ProcessMessage(commands []string, message slack.Msg) {
+func (h *Jira) ProcessMessage(command string, message slack.Msg) {
 	// Process our entries
 	o := new(plugin.SlackResponse)
 	o.Channel = message.Channel
 	if !h.Connect() {
-		o.Text = fmt.Sprintf("Sorry <@%v>, I'm having hard time to reach your jira instance. Please check my logs.", message.User)
+		o.Options = append(o.Options, slack.MsgOptionText(fmt.Sprintf("Sorry <@%v>, I'm having hard time to reach your jira instance. Please check my logs.", message.User), false))
 	} else {
-		o.Params = &slack.PostMessageParameters{
+		o.Options = append(o.Options, slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{
 			Username: "Jira",
 			IconURL:  "http://support.zendesk.com/api/v2/apps/4/assets/logo.png",
-			Text:     fmt.Sprintf("%v is refering to:", message.Username),
-		}
+		}))
 
-		for _, c := range commands {
-			// Strip the leading #
-			c = strings.ToUpper(c[1:])
-			issue, _, err := h.JiraClient.Issue.Get(c, nil)
-			if err != nil {
-				h.Logger.Debug("An error occurs while fetching an issue ", err)
-				continue
-			}
-			if issue != nil {
-				o.Params.Attachments = append(o.Params.Attachments, h.CreateAttachement(issue))
-			}
+		o.Options = append(o.Options, slack.MsgOptionText(fmt.Sprintf("%v is refering to:", message.Username), false))
+
+		// Strip the leading #
+		command = strings.ToUpper(command)
+		issue, _, err := h.JiraClient.Issue.Get(command, nil)
+		if err != nil {
+			h.Logger.Debug("An error occurs while fetching an issue ", zap.Error(err))
+			return
+		}
+		if issue != nil {
+			o.Options = append(o.Options, slack.MsgOptionAttachments(h.CreateAttachement(issue)))
 		}
 	}
-	if len(o.Params.Attachments) > 0 {
+	if len(o.Options) > 0 {
 		h.sink <- o
 	}
-	err := h.JiraClient.Authentication.Logout()
+	err := h.JiraClient.Authentication.Logout() //nolint
 	if err != nil {
-		h.Logger.Errorf("Error while logging out: %v", err)
+		h.Logger.Error("Error while logging out", zap.Error(err))
 	}
 }
 
@@ -222,16 +222,16 @@ func init() {
 	myjira := new(Jira)
 	myjira.Metadata = plugin.NewMetadata("jira")
 	myjira.Description = "Intercept jira bugs IDs."
-	myjira.PassiveTriggers = []plugin.Command{plugin.Command{Name: `#([A-Za-z]{3,8}-{0,1}\d{1,10})`, ShortDescription: "Intercept Jira bug Ids", LongDescription: "Will intercept jira bug IDS ans try to fetch some informations."}}
+	myjira.PassiveTriggers = []plugin.Command{plugin.Command{Name: `#([A-Za-z]{2,8}-{0,1}\d{1,10})`, ShortDescription: "Intercept Jira bug Ids", LongDescription: "Will intercept jira bug IDS ans try to fetch some informations."}}
 	plugin.PluginManager.Register(myjira)
 }
 
 // Connect and authenticate to jira
 func (h *Jira) Connect() bool {
 	if !h.JiraClient.Authentication.Authenticated() {
-		res, err := h.JiraClient.Authentication.AcquireSessionCookie(h.username, h.password)
+		res, err := h.JiraClient.Authentication.AcquireSessionCookie(h.username, h.password) // nolint
 		if err != nil || !res {
-			h.Logger.Errorf("Error while authenticating to jira (%v)", err)
+			h.Logger.Error("Error while authenticating to jira", zap.Error(err))
 			return false
 		}
 	}

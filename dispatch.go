@@ -5,14 +5,17 @@ import (
 	"regexp"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/nlopes/slack"
-	"github.com/sirupsen/logrus"
 )
 
-// DispatchResponses will process reponses from the channel
+// DispatchResponses will process responses from the channel
 func DispatchResponses(output chan *plugin.SlackResponse, bot *plugin.Bot) {
+
 	for msg := range output {
+
 		if strings.HasPrefix(msg.Channel, "U") {
 			msg.Channel = bot.GetIMChannelByUser(msg.Channel).ID
 		} else if strings.HasPrefix(msg.Channel, "#") {
@@ -25,32 +28,35 @@ func DispatchResponses(output chan *plugin.SlackResponse, bot *plugin.Bot) {
 			}
 			msg.Channel = id
 		}
+
 		switch {
-		case msg.Text == "" && msg.Params == nil:
-			Log.Warnf("Nothing to send for message %v", msg)
+
 		case msg.Channel == "":
-			Log.Warnf("No channel found for message %v", msg)
-		case msg.Params != nil:
+			zap.L().Warn("No channel found", zap.Reflect("message", msg))
+
+		case msg.Options == nil:
+			zap.L().Warn("Nothing to send", zap.Reflect("message", msg))
+
+		case msg.Options != nil:
+
 			// Use PostMessage when there is attachments
 			if msg.TrackerID != 0 && bot.Tracker.GetTimeStampFor(msg.TrackerID) != "" {
 				ts := bot.Tracker.GetTimeStampFor(msg.TrackerID)
-				// TODO: The library is not yet handling Attachments update
-				// So we are only updating the Text
-				c, t, _, e := bot.RTM.UpdateMessage(msg.Channel, ts, msg.Text)
+				c, _, _, e := bot.RTM.UpdateMessage(msg.Channel, ts, msg.Options...)
 				if e != nil {
-					Log.Errorf("Error while updating message %v", e)
+					zap.L().Error("Error while updating message", zap.Error(e))
 				} else {
-					Log.Debugf("Updated message %v to %v at %v", msg.Text, c, t)
+					zap.L().Debug("Updated message", zap.String("channel", c))
 					// Update the tracker
 					bot.Tracker.Track(plugin.Tracker{TrackerID: msg.TrackerID, TimeStamp: ts, TTL: 300})
 				}
 			} else {
 				// Else post message
-				c, t, e := bot.RTM.PostMessage(msg.Channel, msg.Text, *msg.Params)
+				c, t, e := bot.RTM.PostMessage(msg.Channel, msg.Options...)
 				if e != nil {
-					Log.Errorf("Error while sending message %v", e)
+					zap.L().Error("Error while sending message", zap.Error(e))
 				} else {
-					Log.Debugf("Sent message %v to %v at %v", msg.Text, c, t)
+					zap.L().Debug("Sent message", zap.String("channel", c))
 					// If the message need to be tracked
 					if msg.TrackerID != 0 && bot.Tracker.GetTimeStampFor(msg.TrackerID) == "" {
 						bot.Tracker.Track(plugin.Tracker{TrackerID: msg.TrackerID, TimeStamp: t, TTL: 300})
@@ -59,8 +65,8 @@ func DispatchResponses(output chan *plugin.SlackResponse, bot *plugin.Bot) {
 			}
 
 		default:
-			// Use RTM for  as default
-			tosend := slack.OutgoingMessage{Channel: msg.Channel, Text: msg.Text, Type: "message"}
+
+			// Use RTM as default
 			if msg.TrackerID != 0 {
 				ts := bot.Tracker.GetTimeStampFor(msg.TrackerID)
 				if ts == "" {
@@ -69,28 +75,31 @@ func DispatchResponses(output chan *plugin.SlackResponse, bot *plugin.Bot) {
 						ttl = msg.TrackedTTL
 					}
 					bot.Tracker.Track(plugin.Tracker{TrackerID: msg.TrackerID, TTL: ttl})
-					tosend.ID = msg.TrackerID
 				} else {
-					_, _, _, err := bot.RTM.UpdateMessage(tosend.Channel, ts, tosend.Text)
+					_, _, _, err := bot.RTM.UpdateMessage(msg.Channel, ts, msg.Options...)
 					if err != nil {
-						Log.Debugf("Failed to Update message %v: %v", tosend.Text, err)
+						zap.L().Error("Failed to Update message", zap.Reflect("message", msg.Options), zap.Error(err))
 
 					} else {
-						Log.Debugf("Updated message %v", tosend.Text)
+						zap.L().Debug("Updated message")
 					}
 					continue
 				}
 			}
-			bot.RTM.SendMessage(&tosend)
-			Log.Debugf("Sent message %v", tosend)
-
+			_, _, e := bot.RTM.PostMessage(msg.Channel, msg.Options...)
+			if e != nil {
+				zap.L().Error("Error while sending message", zap.Error(e))
+			} else {
+				zap.L().Debug("Sent message", zap.Reflect("options", msg.Options))
+			}
 		}
 	}
 }
 
 // checkForCommand will try to detect a comamnd in a message
-// It will tokenise the message (split by splace) for that.
+// It will tokenise the message (split by space) for that.
 func checkForCommand(text string, command string) bool {
+
 	for _, word := range strings.Split(text, " ") {
 		if word == command {
 			return true
@@ -100,49 +109,69 @@ func checkForCommand(text string, command string) bool {
 }
 
 // DispatchMessage to plugins
-func DispatchMessage(prefix string, msg *slack.Msg) {
-	mentionned := strings.HasPrefix(msg.Channel, "D") || strings.Contains(msg.Text, fmt.Sprintf("<@%v>", bot.ID))
+func DispatchMessage(prefix string, msg *slack.MessageEvent) {
+
+	// Check if this is an edited message
+	if msg.SubType == "message_changed" {
+		msg.Msg.Text = msg.SubMessage.Text
+		msg.User = msg.SubMessage.User
+	}
+
+	message := msg.Msg
+
+	// mentionned is true id direct message or message contains mention to us
+	mentionned := strings.HasPrefix(msg.Channel, "D") || strings.Contains(message.Text, fmt.Sprintf("<@%v>", bot.ID))
 
 	// Process active triggers
-loop:
+	// For each plugins
 	for _, p := range plugin.PluginManager.Plugins {
+
+		// Get metadata
 		info := p.GetMetadata()
 		if info.Disabled {
 			continue
 		}
-		for _, c := range info.ActiveTriggers {
-			if (mentionned && info.WhenMentionned) || !info.WhenMentionned {
-				// Look for !action
-				if strings.Contains(msg.Text, prefix+c.Name) ||
-					// Look for @bot action
-					(strings.HasPrefix(msg.Text, fmt.Sprintf("<@%v> ", bot.ID)) && checkForCommand(msg.Text, c.Name)) ||
-					// Look for DM with action
-					(strings.HasPrefix(msg.Channel, "D") && strings.HasPrefix(msg.Text, c.Name)) {
-					// Check if the user have permissions to use this plugin.
-					Log.WithFields(logrus.Fields{"prefix": "[main]", "Command": c.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
-					p.ProcessMessage([]string{c.Name}, *msg)
-					// don't process others
-					continue loop
-				}
-			}
-		}
-		// Process passive triggers
-		for _, r := range info.PassiveTriggers {
-			if (mentionned && info.WhenMentionned) || !info.WhenMentionned {
-				// Check if the user have permissions to use this plugin.
-				reg, err := regexp.Compile(r.Name)
-				if err != nil {
-					Log.WithField("prefix", "[main]").Errorf("Passive trigger %v for %v is not a valid regular expression.", r.Name, info.Name)
-				} else {
-					matches := reg.FindAllString(msg.Text, -1)
-					if len(matches) > 0 {
-						Log.WithFields(logrus.Fields{"prefix": "[main]", "Trigger": r.Name, "Plugin": info.Name}).Debug("Dispatching to plugin")
-						p.ProcessMessage(matches, *msg)
-						continue loop
+
+		func() {
+			// Process active triggers
+			for _, c := range info.ActiveTriggers {
+				if (mentionned && info.WhenMentioned) || !info.WhenMentioned {
+					// Look for !action or @bot action or DM with action
+					if strings.Contains(message.Text, prefix+c.Name) ||
+						(strings.HasPrefix(message.Text, fmt.Sprintf("<@%v> ", bot.ID)) && checkForCommand(message.Text, c.Name)) ||
+						(strings.HasPrefix(msg.Channel, "D") && strings.HasPrefix(message.Text, c.Name)) {
+
+						zap.L().Debug("Dispatching to active plugin", zap.String("plugin", info.Name), zap.String("command", c.Name))
+						p.ProcessMessage(c.Name, message)
+
+						// stop processing if active is matching
+						return
 					}
 				}
 			}
-		}
+
+			// Process one or many passive triggers
+			for _, r := range info.PassiveTriggers {
+				if (mentionned && info.WhenMentioned) || !info.WhenMentioned {
+
+					// Check if the user have permissions to use this plugin.
+					reg, err := regexp.Compile(r.Name)
+					if err != nil {
+						zap.L().Error("Passive trigger is not a valid regular expression", zap.String("trigger", r.Name), zap.String("plugin", info.Name))
+					} else {
+						matches := reg.FindAllString(message.Text, -1)
+						if len(matches) > 0 {
+							zap.L().Debug("Dispatching to passive plugin", zap.String("trigger", r.Name), zap.String("plugin", info.Name))
+							for _, m := range matches {
+								p.ProcessMessage(m, message)
+							}
+						}
+					}
+				}
+			}
+
+		}()
+
 	}
 
 }

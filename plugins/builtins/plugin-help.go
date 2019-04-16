@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"regexp"
 
+	"go.uber.org/zap"
+
 	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/nlopes/slack"
-	"github.com/sirupsen/logrus"
 )
 
 // help struct define your plugin
@@ -30,7 +31,7 @@ func init() {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *help) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *help) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.sink = output
 }
 
@@ -45,23 +46,21 @@ func (h *help) Self() (i interface{}) {
 }
 
 // ProcessMessage interface implementation
-func (h *help) ProcessMessage(commands []string, message slack.Msg) {
+func (h *help) ProcessMessage(command string, message slack.Msg) {
 	helpPluginPattern := regexp.MustCompile(`(help)\s*(\S*)\s*(\S*)`)
 	o := new(plugin.SlackResponse)
-	for _, c := range commands {
-		switch {
-		case helpPluginPattern.MatchString(message.Text):
-			p := helpPluginPattern.FindStringSubmatch(message.Text)
-			o.Text = GetHelpForPlugin(p)
-		case c == "list-plugins":
-			o.Text = PluginList()
-		case c == "list-commands":
-			o.Text = PluginListActions()
-		case c == "list-handlers":
-			o.Text = PluginListHandlers()
-		case c == "list-triggers":
-			o.Text = PluginListTriggers()
-		}
+	switch {
+	case helpPluginPattern.MatchString(message.Text):
+		p := helpPluginPattern.FindStringSubmatch(message.Text)
+		o.Options = append(o.Options, slack.MsgOptionText(GetHelpForPlugin(p), false))
+	case command == "list-plugins":
+		o.Options = append(o.Options, slack.MsgOptionText(PluginList(), false))
+	case command == "list-commands":
+		o.Options = append(o.Options, slack.MsgOptionText(PluginListActions(), false))
+	case command == "list-handlers":
+		o.Options = append(o.Options, slack.MsgOptionText(PluginListHandlers(), false))
+	case command == "list-triggers":
+		o.Options = append(o.Options, slack.MsgOptionText(PluginListTriggers(), false))
 	}
 	o.Channel = message.User
 	h.sink <- o

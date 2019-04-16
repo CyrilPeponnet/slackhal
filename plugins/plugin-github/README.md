@@ -1,8 +1,8 @@
 ## Github plugin
 
-You will need to add a configuraiton file named `plugin-github.yaml` with the following structure:
+You will need to add a configuration file named `plugin-github.yaml` with the following structure:
 
-```
+```yaml
 Repositories:
   - Name: repo/.*
     Branches:

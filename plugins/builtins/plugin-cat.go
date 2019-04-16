@@ -4,21 +4,22 @@ import (
 	"fmt"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/nlopes/slack"
-	"github.com/sirupsen/logrus"
 )
 
 // cat struct define your plugin
 type cat struct {
 	plugin.Metadata
-	Logger *logrus.Entry
+	Logger *zap.Logger
 	sink   chan<- *plugin.SlackResponse
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *cat) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *cat) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	// cats are initless
 	h.sink = output
 }
@@ -29,18 +30,18 @@ func (h *cat) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *cat) ProcessMessage(commands []string, message slack.Msg) {
+func (h *cat) ProcessMessage(command string, message slack.Msg) {
 	// Cat summoned !
 	o := new(plugin.SlackResponse)
 	o.Channel = message.Channel
 	response, err := http.Get("http://thecatapi.com/api/images/get?format=src&type=gif")
 	if err != nil {
-		o.Text = "I cannot find a single funny cat picture on Internet... Looks like the ends of the world..."
+		o.Options = append(o.Options, slack.MsgOptionText("I cannot find a single funny cat picture on Internet... Looks like the ends of the world...", false))
 	} else {
-		o.Text = fmt.Sprintf("Hey <@%v> look what I just found for you: %v", message.User, response.Request.URL)
+		o.Options = append(o.Options, slack.MsgOptionText(fmt.Sprintf("Hey <@%v> look what I just found for you: %v", message.User, response.Request.URL), false))
 	}
 	h.sink <- o
-	defer response.Body.Close()
+	defer response.Body.Close() // nolint
 }
 
 // Self interface implementation

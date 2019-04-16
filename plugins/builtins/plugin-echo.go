@@ -3,9 +3,10 @@ package builtins
 import (
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/nlopes/slack"
-	"github.com/sirupsen/logrus"
 )
 
 // echo struct define your plugin
@@ -16,7 +17,7 @@ type echo struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *echo) Init(Logger *logrus.Entry, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *echo) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.sink = output
 }
 
@@ -26,17 +27,18 @@ func (h *echo) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *echo) ProcessMessage(commands []string, message slack.Msg) {
-	for _, c := range commands {
-		if c == "echo" {
-			o := new(plugin.SlackResponse)
-			o.Text = message.Text[strings.Index(message.Text, c)+len(c)+1 : len(message.Text)]
-			o.Channel = message.Channel
-			// This is a test to implement tracking of message
-			o.TrackerID = 42
-			h.sink <- o
-		}
+func (h *echo) ProcessMessage(command string, message slack.Msg) {
+
+	if len(strings.Split(message.Text, " ")) == 1 {
+		return
 	}
+
+	o := new(plugin.SlackResponse)
+	o.Options = append(o.Options, slack.MsgOptionText(message.Text[strings.Index(message.Text, command)+len(command)+1:len(message.Text)], false))
+	o.Channel = message.Channel
+	// This is a test to implement tracking of message
+	o.TrackerID = 42
+	h.sink <- o
 }
 
 // Self interface implementation

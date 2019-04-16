@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
+	jiraplugin "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
 	"github.com/google/go-github/github"
 	"github.com/nlopes/slack"
 )
@@ -24,17 +24,19 @@ func (h *githook) ProcessPushEvents(event *github.PushEvent) (messages []*plugin
 	message := new(plugin.SlackResponse)
 
 	// Add the PostMessage Parameter
-	message.Params = &slack.PostMessageParameters{
+	message.Options = append(message.Options, slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{
 		Username: "Github",
 		IconURL:  "https://assets-cdn.github.com/images/modules/logos_page/GitHub-Mark.png",
-	}
-	message.Text = fmt.Sprintf("*%v* just pushed %v commit(s) to *%v:%v*\n> <%v|%v>",
+	}))
+
+	text := fmt.Sprintf("*%v* just pushed %v commit(s) to *%v:%v*\n> <%v|%v>",
 		*event.HeadCommit.Author.Name,
 		len(event.Commits),
 		*event.Repo.FullName,
 		branch,
 		*event.HeadCommit.URL,
 		*event.HeadCommit.Message)
+	message.Options = append(message.Options, slack.MsgOptionText(text, false))
 
 	// Look if it closed some Jira tickets :)
 	// Is the plugin available
@@ -52,7 +54,7 @@ func (h *githook) ProcessPushEvents(event *github.PushEvent) (messages []*plugin
 							if jc.Connect() {
 								issue, _, _ := jc.JiraClient.Issue.Get(strings.ToUpper(m[1:]), nil)
 								if issue != nil {
-									message.Params.Attachments = append(message.Params.Attachments, jc.CreateAttachement(issue))
+									message.Options = append(message.Options, slack.MsgOptionAttachments(jc.CreateAttachement(issue)))
 								}
 							}
 						}
@@ -62,22 +64,19 @@ func (h *githook) ProcessPushEvents(event *github.PushEvent) (messages []*plugin
 		}
 	}
 
-	if len(message.Params.Attachments) > 1 {
-		message.Text += fmt.Sprintf("\n\n:tada: %v looks like you closed some issue today :tada:", *event.HeadCommit.Author.Name)
+	if len(message.Options) > 1 {
+		message.Options = append(message.Options, slack.MsgOptionText(fmt.Sprintf("\n\n:tada: %v looks like you closed some issue today :tada:", *event.HeadCommit.Author.Name), false))
 	}
 
 	// Create a new message per channel we need to notify
 	for _, ch := range repodata.Channels {
 		n := new(plugin.SlackResponse)
-		n.Params = message.Params
-		n.Text = message.Text
+		n.Options = message.Options
 		n.Channel = ch
 		messages = append(messages, n)
 	}
 
-	// Add a small comments for the commiter :)
-
-	return
+	return messages
 }
 
 // FilterRepo check if the repo is in the filter list,

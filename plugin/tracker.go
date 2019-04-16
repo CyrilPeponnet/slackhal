@@ -35,7 +35,7 @@ func (t *TrackerManager) Init() {
 	t.Trackers = map[int]*Tracker{}
 	ticker := time.NewTicker(1 * time.Minute)
 	go func() {
-		for _ = range ticker.C {
+		for range ticker.C {
 			t.garbageCollector()
 		}
 	}()

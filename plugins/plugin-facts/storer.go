@@ -3,6 +3,8 @@ package pluginfacts
 import (
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/asdine/storm"
 )
 
@@ -39,8 +41,10 @@ func (s *stormDB) NumberOfFacts() int {
 }
 
 func (s *stormDB) ListFacts() (factlist []fact) {
-	s.db.All(&factlist)
-	return
+	if err := s.db.All(&factlist); err != nil {
+		zap.L().Error("Error while getting facts", zap.Error(err))
+	}
+	return factlist
 }
 
 func (s *stormDB) DelFact(name string) (err error) {

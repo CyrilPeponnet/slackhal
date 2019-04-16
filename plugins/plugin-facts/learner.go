@@ -51,7 +51,7 @@ func (f *learn) New(message slack.Msg) string {
 	}
 	currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
 	if currentFact == "" {
-		return "Can you please provide a non empty string? Aborting leaning process... Consul `!help fact`"
+		return "Can you please provide a non empty string? Aborting leaning process... Consult `!help fact`"
 	}
 	f.entries = append(f.entries, &learningFact{Channel: message.Channel, User: message.User, Fact: fact{Name: currentFact, RestrictToChannelsID: []string{}}, State: Content})
 	return fmt.Sprintf("Ok <@%v> let's do that! Can you define _%v_? \n(type stop-learning to stop this learning session)", message.User, currentFact)
@@ -70,7 +70,7 @@ func (f *learn) Cancel(message slack.Msg) string {
 	return fmt.Sprintf("Sorry <@%v>, no learning session are pending.", message.User)
 }
 
-// Learn will contine a learning session and return the fact once done.
+// Learn will continue a learning session and return the fact once done.
 func (f *learn) Learn(message slack.Msg) (fact fact, response string) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -107,5 +107,5 @@ func (f *learn) Learn(message slack.Msg) (fact fact, response string) {
 			}
 		}
 	}
-	return
+	return fact, ""
 }

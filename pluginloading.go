@@ -1,20 +1,22 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
 )
 
 func initPLugins(disabledPlugins []string, httpPort string, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+
 	// Loading our plugin and Init them
 	handlers := false
 	if len(disabledPlugins) != 0 {
-		Log.WithField("prefix", "[main]").Infof("Plugins %v are disabled", strings.Join(disabledPlugins, ", "))
+		zap.L().Info("Plugins disabled", zap.String("plugins", strings.Join(disabledPlugins, ", ")))
 	}
-	Log.WithField("prefix", "[main]").Info("Loading plugins")
+	zap.L().Info("Loading plugins")
 
 Loading:
 	for _, p := range plugin.PluginManager.Plugins {
@@ -25,19 +27,22 @@ Loading:
 				continue Loading
 			}
 		}
-		Log.WithField("prefix", "[main]").Infof(" - %v version %v", meta.Name, meta.Version)
-		p.Init(Log.WithField("prefix", fmt.Sprintf("[plugin %v]", meta.Name)), output, bot)
+		zap.L().Info("Loading", zap.String("plugin", meta.Name), zap.String("version", meta.Version))
+		p.Init(zap.L().Named(meta.Name), output, bot)
 		// Register handlers if any
 		for route, handler := range meta.HTTPHandler {
 			handlers = true
-			Log.WithField("prefix", "[main]").Infof("  -> Registering HTTP handler for %v", route.Name)
+			zap.L().Info("Registering HTTP handler", zap.String("plugin", route.Name), zap.String("address", httpPort))
 			http.Handle(route.Name, handler)
 		}
 	}
 
 	// Start the http handler if we have some handlers registered.
 	if handlers {
-		Log.WithField("prefix", "[main]").Infof("HTTP Handler Started on port %v", httpPort)
-		go func() { Log.Fatal(http.ListenAndServe(httpPort, nil)) }()
+		go func() {
+			if err := http.ListenAndServe(httpPort, nil); err != nil {
+				zap.L().Fatal("Failed to register HTTP handler", zap.String("address", httpPort), zap.Error(err))
+			}
+		}()
 	}
 }

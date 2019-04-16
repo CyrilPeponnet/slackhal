@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/nlopes/slack"
-	"github.com/sirupsen/logrus"
 )
 
 // Metadata struct
@@ -15,12 +16,12 @@ type Metadata struct {
 	Version     string
 	// Active trigers are commands
 	ActiveTriggers []Command
-	// Passive triggers are regex parterns that will try to get matched
+	// Passive triggers are regex patterns that will try to get matched
 	PassiveTriggers []Command
 	// Webhook handler
 	HTTPHandler map[Command]http.Handler
 	// Only trigger this plugin if the bot is mentionned
-	WhenMentionned bool
+	WhenMentioned bool
 	// Disabled state
 	Disabled bool
 }
@@ -37,7 +38,7 @@ func NewMetadata(name string) (m Metadata) {
 	m.Name = name
 	m.Description = fmt.Sprintf("%v's description", name)
 	m.Version = "1.0"
-	m.WhenMentionned = false
+	m.WhenMentioned = false
 	m.Disabled = false
 	m.HTTPHandler = make(map[Command]http.Handler)
 	return
@@ -48,14 +49,13 @@ type SlackResponse struct {
 	Channel    string
 	TrackerID  int
 	TrackedTTL int
-	Text       string
-	Params     *slack.PostMessageParameters
+	Options    []slack.MsgOption
 }
 
 // Plugin Interface
 type Plugin interface {
-	Init(Logger *logrus.Entry, output chan<- *SlackResponse, bot *Bot)
+	Init(Logger *zap.Logger, output chan<- *SlackResponse, bot *Bot)
 	GetMetadata() *Metadata
-	ProcessMessage(commands []string, message slack.Msg)
+	ProcessMessage(command string, message slack.Msg)
 	Self() interface{}
 }
