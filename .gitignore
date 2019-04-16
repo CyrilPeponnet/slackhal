@@ -4,3 +4,4 @@ slackhal
 plugin-*.yaml
 slackhal.yaml
 facts.db
+dist
