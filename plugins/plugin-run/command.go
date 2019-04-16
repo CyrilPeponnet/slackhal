@@ -132,7 +132,7 @@ func (h *run) processCommand(message slack.Msg, cmd command, args []string) {
 		_, err := h.bot.RTM.UploadFile(f)
 		if err != nil {
 
-			zap.L().Error("Failed to upload file", zap.Error(err))
+			h.Logger.Error("Failed to upload file", zap.Error(err))
 			r.Options = append(r.Options, slack.MsgOptionText("Uhoh, something went wrong while uploading the file.", false))
 
 		} else {
@@ -156,10 +156,17 @@ func (h *run) ProcessMessage(cmd string, message slack.Msg) {
 
 	// Check command ACL
 	for _, command := range h.commands {
+
 		if command.Name == cmd {
+
 			if isAuthorized(user, command.AllowedUsers) {
+				h.Logger.Debug("Authorized user", zap.String("email", user))
 				h.processCommand(message, command, cmdArgs)
+
+			} else {
+				h.Logger.Debug("Unathorized user", zap.String("email", user))
 			}
+
 			return
 		}
 	}
@@ -176,14 +183,12 @@ func isAuthorized(user string, users []string) bool {
 	if len(users) > 0 {
 		for _, authzUser := range users {
 			if authzUser == user {
-				zap.L().Debug("Authorized user", zap.String("email", user))
 				return true
 			}
 		}
 	} else {
 		return true
 	}
-	zap.L().Debug("Unauthorized user", zap.String("email", user))
 	return false
 }
 
@@ -191,7 +196,7 @@ func isAuthorized(user string, users []string) bool {
 func init() {
 
 	runner := new(run)
-	runner.Metadata = plugin.NewMetadata("run")
+	runner.Metadata = plugin.NewMetadata("Runner")
 	runner.Description = "Run commands."
 	runner.ActiveTriggers = []plugin.Command{plugin.Command{Name: `run`, ShortDescription: "Run a command.", LongDescription: "Run commands."}}
 	plugin.PluginManager.Register(runner)

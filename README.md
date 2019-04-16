@@ -37,20 +37,22 @@ You can take a look at the builtins plugins to understand how it works.
 
 ## Plugins implementation
 
-Your plugin must implement the following interfaces:
+Your plugin must implement the following interface:
 
 ```go
-Init(Logger *zap.Logger, output chan<- *SlackResponse)
-GetMetadata() *Metadata
-ProcessMessage(command string, message slack.Msg)
-Self() interface{}
+type Plugin interface {
+  Init(Logger *zap.Logger, output chan<- *SlackResponse, bot *Bot)
+  GetMetadata() *Metadata
+  ProcessMessage(command string, message slack.Msg)
+  Self() interface{}
+}
 ```
 
 ### The `Init` function
 
 Will be called upon plugin login. You can use it if you need to init some stuff.
 
-You can use the `Logrus.Entry` as a logger factory for your plugin.
+You can use the `Logger` as a logger factory for your plugin.
 
 You will use `output` chan to send your responses back.
 
@@ -133,9 +135,7 @@ _ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
 
 where `pluginjira` is the subfolder where your package is stored.
 
-__TODO: Maybe we could use go-generate for that__
-
-### Example:
+### Example
 
 ```go
 package builtins
@@ -143,9 +143,10 @@ package builtins
 import (
   "strings"
 
-  "github.com/sirupsen/logrus"
-  "github.com/nlopes/slack"
+  "go.uber.org/zap"
+
   "github.com/CyrilPeponnet/slackhal/plugin"
+  "github.com/nlopes/slack"
 )
 
 // echo struct define your plugin
@@ -167,18 +168,22 @@ func (h *echo) GetMetadata() *plugin.Metadata {
 
 // ProcessMessage interface implementation
 func (h *echo) ProcessMessage(command string, message slack.Msg) {
-  for _, c := range commands {
-    if c == "echo" {
-      o := new(plugin.SlackResponse)
-      o.Text = strings.Replace(message.Text, c+" ", "", 1)
-      o.Channel = message.Channel
-      h.sink <- o
-    }
+
+  if len(strings.Split(message.Text, " ")) == 1 {
+    return
   }
+
+  o := new(plugin.SlackResponse)
+  o.Options = append(o.Options, slack.MsgOptionText(message.Text[strings.Index(message.Text, command)+len(command)+1:len(message.Text)], false))
+  o.Channel = message.Channel
+  // This is a test to implement tracking of message
+  o.TrackerID = 42
+  h.sink <- o
 }
 
-func (h *echo) Self() interface{}{
-	//Nothing
+// Self interface implementation
+func (h *echo) Self() (i interface{}) {
+  return h
 }
 
 // init function that will register your plugin to the plugin manager
@@ -221,7 +226,6 @@ type Metadata struct {
 }
 ```
 
-
 ### Active triggers
 
 Define a command like `help`. The bot will look for either:
@@ -261,7 +265,6 @@ type SlackResponse struct {
   TrackedTTL int
   Options    []slack.MsgOption
 }
-
 ```
 
 Be sure to set the `Channel field` (you can take it from `message.Channel`).

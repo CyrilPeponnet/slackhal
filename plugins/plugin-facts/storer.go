@@ -3,8 +3,6 @@ package pluginfacts
 import (
 	"strings"
 
-	"go.uber.org/zap"
-
 	"github.com/asdine/storm"
 )
 
@@ -13,7 +11,7 @@ type factStorer interface {
 	Connect(string) error
 	AddFact(*fact) error
 	DelFact(name string) error
-	ListFacts() []fact
+	ListFacts() ([]fact, error)
 	NumberOfFacts() int
 	FindFact(message string) *fact
 	FindFactByName(name string) *fact
@@ -40,11 +38,11 @@ func (s *stormDB) NumberOfFacts() int {
 	return n
 }
 
-func (s *stormDB) ListFacts() (factlist []fact) {
+func (s *stormDB) ListFacts() (factlist []fact, err error) {
 	if err := s.db.All(&factlist); err != nil {
-		zap.L().Error("Error while getting facts", zap.Error(err))
+		return nil, err
 	}
-	return factlist
+	return factlist, nil
 }
 
 func (s *stormDB) DelFact(name string) (err error) {

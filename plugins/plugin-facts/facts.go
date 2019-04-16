@@ -113,7 +113,11 @@ func (h *facts) ProcessMessage(command string, message slack.Msg) {
 			h.simpleResponse(message, fmt.Sprintf("Sorry cannot find a fact with name _%v_", name))
 		}
 	case cmdlist:
-		factsList := h.factDB.ListFacts()
+		factsList, err := h.factDB.ListFacts()
+		if err != nil {
+			h.Logger.Error("Error while getting facts", zap.Error(err))
+			return
+		}
 		content := "Here is the facts I know:\n"
 		for _, f := range factsList {
 			content += fmt.Sprintf("\n>%v", f.Name)
@@ -158,7 +162,7 @@ func (h *facts) ProcessMessage(command string, message slack.Msg) {
 				h.simpleResponse(message, fmt.Sprintf("I now know %v facts.", h.factDB.NumberOfFacts()))
 			} else {
 				h.simpleResponse(message, "UhOh something bad happened.")
-				zap.L().Error("Error while adding facto to db", zap.Error(err))
+				h.Logger.Error("Error while adding facto to db", zap.Error(err))
 			}
 		}
 
