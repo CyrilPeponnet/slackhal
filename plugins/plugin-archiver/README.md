@@ -1,13 +1,14 @@
 # Archiver plugin
 
-Will log followed channel to botbot-me postgresql database.
+Will log followed channel to `botbot-me` `postgresql` database.
 
 ## Configuration file
+
 A configuration file is required for this plugin to work:
 
 It must be named `plugin-archiver.yaml` and contains:
 
-```
+```yaml
 Database:
   url: <db base url>
   username: <username>

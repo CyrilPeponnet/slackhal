@@ -13,10 +13,10 @@ import (
 	"github.com/spf13/viper"
 
 	_ "github.com/CyrilPeponnet/slackhal/plugins/builtins"
-	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-archiver"
+	// _ "github.com/CyrilPeponnet/slackhal/plugins/plugin-archiver"
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-facts"
-	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-github"
-	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
+	// _ "github.com/CyrilPeponnet/slackhal/plugins/plugin-github"
+	// _ "github.com/CyrilPeponnet/slackhal/plugins/plugin-jira"
 	_ "github.com/CyrilPeponnet/slackhal/plugins/plugin-run"
 )
 

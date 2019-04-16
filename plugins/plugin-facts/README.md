@@ -2,7 +2,7 @@
 
 You can teach some facts and ask them later
 
-```
+```console
 m: @bot new-fact How old is the bot
 bot: Ok @m let's do that! Can you define _How old is the bot_?
 (type stop-learning to stop this learning session)
@@ -17,15 +17,14 @@ bot: I now know 1 facts.
 
 Then
 
-```
+```console
 m: @bot how old are you?
 bot: I have no age, I'm forever young.
 ```
 
 ## Configuration file
 
-A yaml named `plugin-facts.yaml` must be present with the following content:
-
+A `yaml` named `plugin-facts.yaml` must be present with the following content:
 
 ```yaml
 database:
