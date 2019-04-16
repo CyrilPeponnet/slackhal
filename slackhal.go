@@ -37,7 +37,8 @@ Options:
 	-f, --file config        The configuration file to load [default ./slackhal.yml]
 	--trigger char           The char used to detect direct commands [default: !].
 	--http-handler-port port The Port of the http handler [default: :8080].
-	-l, --log-level level    Set the log level [default: error].
+	--log-level level        Set the log level [default: error].
+	--log-format format      Set the log format [default: console].
 `
 	color.Blue(` __ _            _                _
 / _\ | ____  ___| | __ /\  /\____| |
@@ -52,26 +53,34 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 	// Load configuration file and override some args if needed.
 
 	if args["--file"] != nil {
+
+		viper.AddConfigPath("/etc/slackhal/")
+		viper.AddConfigPath("$HOME/.slackhal")
+		viper.AddConfigPath(".")
 		viper.SetConfigFile(args["--file"].(string))
+
 		err := viper.ReadInConfig()
 		if err != nil {
 			panic(fmt.Sprintf("Cannot read the provided configuration file: %v", err))
 		}
-		args["--token"] = viper.GetString("bot.token")
-		args["--log-level"] = viper.GetString("bot.log.level")
-		args["--trigger"] = viper.GetString("bot.trigger")
-		args["--http-handler-port"] = viper.GetString("bot.httpHandlerPort")
+
+		viper.SetDefault("bot.token", args["--token"])
+		viper.SetDefault("bot.log.level", args["--log-level"])
+		viper.SetDefault("bot.log.format", args["--log-format"])
+		viper.SetDefault("bot.trigger", args["--trigger"])
+		viper.SetDefault("bot.httpHandlerPort", args["--http-handler-port"])
+
 		disabledPlugins = viper.GetStringSlice("bot.plugins.disabled")
 	}
 
-	logutils.ConfigureWithOptions(args["--log-level"].(string), "console", "", false, false)
+	logutils.ConfigureWithOptions(viper.GetString("bot.log.level"), viper.GetString("bot.log.format"), "", false, false)
 
 	// Connect to slack and start runloop
-	if args["--token"] == nil {
+	if viper.GetString("bot.token") == "nil" {
 		zap.L().Fatal("You need to set the slack bot token!")
 	}
 
-	bot.API = slack.New(args["--token"].(string))
+	bot.API = slack.New(viper.GetString("bot.token"))
 	bot.RTM = bot.API.NewRTM()
 
 	go bot.RTM.ManageConnection()
@@ -82,7 +91,7 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 	zap.L().Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do...")
 
 	// Init our plugins
-	initPLugins(disabledPlugins, args["--http-handler-port"].(string), output, &bot)
+	initPLugins(disabledPlugins, viper.GetString("bot.httpHandlerPort"), output, &bot)
 
 	// Initialize our message tracker
 	bot.Tracker.Init()
@@ -116,7 +125,7 @@ Loop:
 				}
 			}
 
-			go DispatchMessage(args["--trigger"].(string), ev)
+			go DispatchMessage(viper.GetString("bot.trigger"), ev)
 
 		case *slack.AckMessage:
 			bot.Tracker.UpdateTracking(ev)

@@ -49,6 +49,8 @@ func (h *archiver) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse,
 	h.sink = output
 	h.bot = bot
 	h.configuration = viper.New()
+	h.configuration.AddConfigPath("/etc/slackhal/")
+	h.configuration.AddConfigPath("$HOME/.slackhal")
 	h.configuration.AddConfigPath(".")
 	h.configuration.SetConfigName("plugin-archiver")
 	h.configuration.SetConfigType("yaml")

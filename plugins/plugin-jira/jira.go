@@ -47,6 +47,8 @@ func (h *Jira) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot
 	h.Logger = Logger
 	h.sink = output
 	h.configuration = viper.New()
+	h.configuration.AddConfigPath("/etc/slackhal/")
+	h.configuration.AddConfigPath("$HOME/.slackhal")
 	h.configuration.AddConfigPath(".")
 	h.configuration.SetConfigName("plugin-jira")
 	h.configuration.SetConfigType("yaml")

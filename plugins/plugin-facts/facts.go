@@ -27,6 +27,8 @@ func (h *facts) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bo
 	h.sink = output
 	h.learner = new(learn)
 	h.configuration = viper.New()
+	h.configuration.AddConfigPath("/etc/slackhal/")
+	h.configuration.AddConfigPath("$HOME/.slackhal")
 	h.configuration.AddConfigPath(".")
 	h.configuration.SetConfigName("plugin-facts")
 	h.configuration.SetConfigType("yaml")

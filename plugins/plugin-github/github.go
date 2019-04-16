@@ -48,6 +48,8 @@ func (h *githook) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, 
 	h.HTTPHandler[plugin.Command{Name: "/github", ShortDescription: "Github event hook.", LongDescription: "Github event hook."}] = s
 
 	// Read the configuration
+	h.configuration.AddConfigPath("/etc/slackhal/")
+	h.configuration.AddConfigPath("$HOME/.slackhal")
 	h.configuration.AddConfigPath(".")
 	h.configuration.SetConfigName("plugin-github")
 	h.configuration.SetConfigType("yaml")
