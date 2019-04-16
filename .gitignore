@@ -1,2 +1,6 @@
 .DS_Store
 vendor
+slackhal
+plugin-*.yaml
+slackhal.yaml
+facts.db

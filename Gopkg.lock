@@ -101,12 +101,6 @@
   revision = "04140366298a54a039076d798123ffa108fff46c"
 
 [[projects]]
-  name = "github.com/konsorten/go-windows-terminal-sequences"
-  packages = ["."]
-  revision = "f55edac94c9bbba5d6182a4be46d86a2c9b5b50e"
-  version = "v1.0.2"
-
-[[projects]]
   name = "github.com/lib/pq"
   packages = [
     ".",
@@ -160,12 +154,6 @@
   packages = ["."]
   revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
   version = "v0.8.1"
-
-[[projects]]
-  name = "github.com/sirupsen/logrus"
-  packages = ["."]
-  revision = "8bdbc7bcc01dcbb8ec23dc8a28e332258d25251f"
-  version = "v1.4.1"
 
 [[projects]]
   name = "github.com/spf13/afero"
@@ -280,6 +268,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9723dea821e7ab307292e37bd591ca015cd9e4efdbf815f6dfb3087b467f1ffc"
+  inputs-digest = "5903e2aba3ad0d68bc749c1d6b3f5c5d3e5c027459779aeb996e1bf906e26595"
   solver-name = "gps-cdcl"
   solver-version = 1
