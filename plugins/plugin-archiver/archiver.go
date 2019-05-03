@@ -38,7 +38,6 @@ func (h *archiver) simpleResponse(message slack.Msg, text string) {
 	r := new(plugin.SlackResponse)
 	r.Channel = message.Channel
 	r.Options = append(r.Options, slack.MsgOptionText(text, false))
-	r.Options = append(r.Options, slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{UnfurlLinks: true, AsUser: true}))
 	h.sink <- r
 }
 
@@ -90,7 +89,7 @@ func (h *archiver) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *archiver) ProcessMessage(command string, message slack.Msg) {
+func (h *archiver) ProcessMessage(command string, message slack.Msg) bool {
 	channel := message.Channel
 	name := h.bot.GetNameFromID(message.Channel)
 	public := true
@@ -171,7 +170,7 @@ func (h *archiver) ProcessMessage(command string, message slack.Msg) {
 			}
 		}
 	}
-
+	return false
 }
 
 // Self interface implementation

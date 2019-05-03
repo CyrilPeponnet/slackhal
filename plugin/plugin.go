@@ -56,6 +56,6 @@ type SlackResponse struct {
 type Plugin interface {
 	Init(Logger *zap.Logger, output chan<- *SlackResponse, bot *Bot)
 	GetMetadata() *Metadata
-	ProcessMessage(command string, message slack.Msg)
+	ProcessMessage(command string, message slack.Msg) bool
 	Self() interface{}
 }

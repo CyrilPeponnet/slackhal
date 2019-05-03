@@ -9,7 +9,7 @@ import (
 	"github.com/CyrilPeponnet/slackhal/plugin"
 )
 
-func initPLugins(disabledPlugins []string, httpPort string, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func initPlugins(disabledPlugins []string, httpPort string, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 
 	// Loading our plugin and Init them
 	handlers := false

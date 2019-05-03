@@ -61,19 +61,17 @@ func (h *facts) simpleResponse(message slack.Msg, text string) {
 	r := new(plugin.SlackResponse)
 	r.Channel = message.Channel
 	r.Options = append(r.Options, slack.MsgOptionText(text, false))
-	r.Options = append(r.Options, slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{UnfurlLinks: true, AsUser: true}))
 	h.sink <- r
 }
 
 // ProcessMessage interface implementation
-func (h *facts) ProcessMessage(command string, message slack.Msg) {
+func (h *facts) ProcessMessage(command string, message slack.Msg) bool {
 
 	switch command {
 	case cmdnew:
 		currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
 		if h.factDB.FindFactByName(currentFact) != nil {
 			h.simpleResponse(message, "I'm afraid I cannot do that. There is already a fact registered with that name.")
-			return
 		}
 		h.simpleResponse(message, h.learner.New(message))
 	case cmdcancel:
@@ -118,7 +116,7 @@ func (h *facts) ProcessMessage(command string, message slack.Msg) {
 		factsList, err := h.factDB.ListFacts()
 		if err != nil {
 			h.Logger.Error("Error while getting facts", zap.Error(err))
-			return
+			return false
 		}
 		content := "Here is the facts I know:\n"
 		for _, f := range factsList {
@@ -152,9 +150,9 @@ func (h *facts) ProcessMessage(command string, message slack.Msg) {
 			if allowedChan(foundFact, message) {
 				if foundFact.Content != "" {
 					h.simpleResponse(message, fmt.Sprintf("<@%v>: %v", message.User, foundFact.Content))
+					return true
 				}
 			}
-
 		}
 		// continue learning if any
 		f, r := h.learner.Learn(message)
@@ -166,9 +164,11 @@ func (h *facts) ProcessMessage(command string, message slack.Msg) {
 				h.simpleResponse(message, "UhOh something bad happened.")
 				h.Logger.Error("Error while adding facto to db", zap.Error(err))
 			}
+			return true
 		}
-
+		return false
 	}
+	return true
 }
 
 // allowedChan return if we are in an allowed chan

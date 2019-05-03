@@ -1,9 +1,12 @@
 package runplugin
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/fsnotify/fsnotify"
@@ -26,7 +29,7 @@ type run struct {
 type command struct {
 	Name         string
 	Description  string
-	Command      string
+	Command      []string
 	AllowedUsers []string
 }
 
@@ -34,11 +37,10 @@ func (h *run) ReloadConfiguration() {
 
 	err := h.configuration.ReadInConfig()
 	if err != nil {
-		h.Logger.Fatal("Not able to read configuration for run plugin.", zap.Error(err))
+		h.Logger.Error("Not able to read configuration for run plugin.", zap.Error(err))
 	} else {
-
 		if err := h.configuration.UnmarshalKey("Commands", &h.commands); err != nil {
-			h.Logger.Fatal("Error while reading configuration", zap.Error(err))
+			h.Logger.Error("Error while reading configuration", zap.Error(err))
 		}
 	}
 
@@ -94,32 +96,56 @@ func (h *run) GetMetadata() *plugin.Metadata {
 	return &h.Metadata
 }
 
-func (h *run) processCommand(message slack.Msg, cmd command, args []string) {
+func (h *run) processCommand(message slack.Msg, cmd command, args []string, user slack.User) {
 
 	var msg string
 	var command string
 
-	if cmd.Command != "" {
-		command = strings.Split(cmd.Command, " ")[0]
-		args = append(strings.Split(cmd.Command, " ")[1:], args...)
+	cargs := args
+
+	if len(cmd.Command) > 0 {
+		command = cmd.Command[0]
+		args = append(cmd.Command[1:], args...)
 	} else {
 		command = cmd.Name
 	}
 
-	t, err := exec.Command(command, args...).CombinedOutput()
-	if err != nil {
-		msg = fmt.Sprintf("Command `%s %s` failed with error: `%s`, Output: ```%s```", command, strings.Join(args, " "), err, t)
-	} else {
-		msg = string(t)
-	}
-
-	if msg == "" {
-		msg = "This is done."
-	}
-
 	r := new(plugin.SlackResponse)
 	r.Channel = message.Channel
-	r.Options = append(r.Options, slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{UnfurlLinks: true, AsUser: true}))
+	r.Options = append(r.Options, slack.MsgOptionText("thinking...", true), slack.MsgOptionMeMessage())
+	// ACK the order while processing
+	h.sink <- r
+
+	// Reset the message
+	r = new(plugin.SlackResponse)
+	r.Channel = message.Channel
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+
+	h.Logger.Debug("Run command", zap.String("command", command), zap.Strings("args", args))
+	c := exec.CommandContext(ctx, command, args...)
+
+	// Set some en var for scripts
+	c.Env = os.Environ()
+	c.Env = append(c.Env, []string{
+		fmt.Sprintf("USER=%s", user.Name),
+	}...)
+
+	t, err := c.CombinedOutput()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			msg = fmt.Sprintf("Command `%s %s` timed out and got killed.", cmd.Name, strings.Join(cargs, " "))
+		} else {
+			msg = fmt.Sprintf("Command `%s %s` failed with error: `%s`.\n Output: ```%s```", cmd.Name, strings.Join(cargs, " "), err, t)
+		}
+	} else {
+		if len(t) == 0 {
+			msg = "This is done."
+		} else {
+			msg = "Here you go: \n```" + string(t) + "```"
+		}
+	}
 
 	// Upload as file if too big
 	if len(msg) > 10000 {
@@ -135,26 +161,38 @@ func (h *run) processCommand(message slack.Msg, cmd command, args []string) {
 		if err != nil {
 
 			h.Logger.Error("Failed to upload file", zap.Error(err))
-			r.Options = append(r.Options, slack.MsgOptionText("Uhoh, something went wrong while uploading the file.", false))
+			r.Options = []slack.MsgOption{slack.MsgOptionText("Uhoh, something went wrong while uploading the file.", false)}
 
 		} else {
 
-			r.Options = append(r.Options, slack.MsgOptionText("Alright, you can see the output above.", false))
+			r.Options = []slack.MsgOption{slack.MsgOptionText("Alright, you can see the output above.", false)}
 
 		}
 
 	} else {
 
-		r.Options = append(r.Options, slack.MsgOptionText("Here you go: \n```"+string(t)+"```", false))
+		r.Options = []slack.MsgOption{slack.MsgOptionText(msg, false)}
 	}
+	// Update the previous message
 	h.sink <- r
 }
 
 // ProcessMessage interface implementation
-func (h *run) ProcessMessage(cmd string, message slack.Msg) {
+func (h *run) ProcessMessage(cmd string, message slack.Msg) bool {
 
-	user := h.bot.GetUserInfos(message.User).Profile.Email
-	cmdArgs := strings.Split(message.Text, " ")[1:]
+	user := h.bot.GetUserInfos(message.User)
+	cmdArgs := strings.Split(message.Text, " ")
+
+	// Locate args if any, they are after the command
+	for i, arg := range cmdArgs {
+		if strings.ToLower(arg) == cmd {
+			if i < len(cmdArgs) {
+				cmdArgs = cmdArgs[i+1:]
+			} else {
+				cmdArgs = []string{}
+			}
+		}
+	}
 
 	// Check command ACL
 	for _, command := range h.commands {
@@ -162,29 +200,29 @@ func (h *run) ProcessMessage(cmd string, message slack.Msg) {
 		if command.Name == cmd {
 
 			if isAuthorized(user, command.AllowedUsers) {
-				h.Logger.Debug("Authorized user", zap.String("email", user))
-				h.processCommand(message, command, cmdArgs)
+				h.Logger.Debug("Authorized user", zap.String("email", user.Profile.Email))
+				h.processCommand(message, command, cmdArgs, user)
 
 			} else {
-				h.Logger.Debug("Unathorized user", zap.String("email", user))
+				h.Logger.Debug("Unathorized user", zap.String("email", user.Profile.Email))
+				r := new(plugin.SlackResponse)
+				r.Channel = message.Channel
+				r.Options = append(r.Options, slack.MsgOptionText("Just what do you think you're doing?", false))
+				h.sink <- r
 			}
 
-			return
+			return true
 		}
 	}
 
-	r := new(plugin.SlackResponse)
-	r.Channel = message.Channel
-	r.Options = append(r.Options, slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{UnfurlLinks: true, AsUser: true}))
-	r.Options = append(r.Options, slack.MsgOptionText("Just what do you think you're doing?", false))
-	h.sink <- r
+	return false
 }
 
-func isAuthorized(user string, users []string) bool {
+func isAuthorized(user slack.User, users []string) bool {
 
 	if len(users) > 0 {
 		for _, authzUser := range users {
-			if authzUser == user {
+			if authzUser == user.Profile.Email {
 				return true
 			}
 		}

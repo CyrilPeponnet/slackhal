@@ -185,7 +185,7 @@ func (h *Jira) CreateAttachement(issue *jira.Issue) (attachement slack.Attachmen
 }
 
 // ProcessMessage interface implementation
-func (h *Jira) ProcessMessage(command string, message slack.Msg) {
+func (h *Jira) ProcessMessage(command string, message slack.Msg) bool {
 	// Process our entries
 	o := new(plugin.SlackResponse)
 	o.Channel = message.Channel
@@ -204,7 +204,7 @@ func (h *Jira) ProcessMessage(command string, message slack.Msg) {
 		issue, _, err := h.JiraClient.Issue.Get(command, nil)
 		if err != nil {
 			h.Logger.Debug("An error occurs while fetching an issue ", zap.Error(err))
-			return
+			return false
 		}
 		if issue != nil {
 			o.Options = append(o.Options, slack.MsgOptionAttachments(h.CreateAttachement(issue)))
@@ -217,6 +217,7 @@ func (h *Jira) ProcessMessage(command string, message slack.Msg) {
 	if err != nil {
 		h.Logger.Error("Error while logging out", zap.Error(err))
 	}
+	return true
 }
 
 // init function that will register your plugin to the plugin manager

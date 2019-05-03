@@ -5,18 +5,24 @@ You will need to add a configuration file named `plugin-run.yaml` with the follo
 ```yaml
 Commands:
 - Name: "test"
-  Decription: "Run a gogo test, takes args like ruglar gogo test command"
-  Command: "gogo test"
+  Decription: "Run a du"
+  Command:
+  - du
+  - -ha
   AlowedUsers:
-  - antoine@aporeto.com
+  - alice@acme.tld
 - Name: ls
   Decription: "It list files, you can pass args"
 - Name: sh
   AllowedUsers:
-  - cyril@aporeto.com
+  - bob@acme.tld
 ```
 
 `name`: The name or the command to run.
 `description`: A description of the command.
 `command` is the command to run in lieu of `name` if provided. So you can make aliases.
 `AllowsedUsers` if present is the list of allowed users.
+
+During execution you can use the following env var:
+
+- USER

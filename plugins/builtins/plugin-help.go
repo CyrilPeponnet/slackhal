@@ -2,6 +2,7 @@ package builtins
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 	"regexp"
 
 	"go.uber.org/zap"
@@ -46,7 +47,7 @@ func (h *help) Self() (i interface{}) {
 }
 
 // ProcessMessage interface implementation
-func (h *help) ProcessMessage(command string, message slack.Msg) {
+func (h *help) ProcessMessage(command string, message slack.Msg) bool {
 	helpPluginPattern := regexp.MustCompile(`(help)\s*(\S*)\s*(\S*)`)
 	o := new(plugin.SlackResponse)
 	switch {
@@ -64,6 +65,7 @@ func (h *help) ProcessMessage(command string, message slack.Msg) {
 	}
 	o.Channel = message.User
 	h.sink <- o
+	return true
 }
 
 // PluginListTriggers list plugins triggers
@@ -136,7 +138,7 @@ func PluginListActions() (o string) {
 		}
 	}
 	if l != "" {
-		o = "Here are all the commands availables:\n"
+		o = fmt.Sprintf("Here are all the commands availables:\n (Can be invoqued either through direct message, mention, or with the trigger prefix %s", viper.GetString("bot.trigger"))
 		o += l
 	} else {
 		o = "Cannot find any plugin actions."

@@ -27,18 +27,26 @@ func (h *echo) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *echo) ProcessMessage(command string, message slack.Msg) {
+func (h *echo) ProcessMessage(command string, message slack.Msg) bool {
 
 	if len(strings.Split(message.Text, " ")) == 1 {
-		return
+		return false
 	}
 
+	start := strings.Index(message.Text, command)
+	size := len(command)
+	if start+size+1 >= len(message.Text) {
+		return false
+	}
+	msg := message.Text[start+size+1 : len(message.Text)]
+
 	o := new(plugin.SlackResponse)
-	o.Options = append(o.Options, slack.MsgOptionText(message.Text[strings.Index(message.Text, command)+len(command)+1:len(message.Text)], false))
+	o.Options = append(o.Options, slack.MsgOptionText(msg, false))
 	o.Channel = message.Channel
 	// This is a test to implement tracking of message
 	o.TrackerID = 42
 	h.sink <- o
+	return true
 }
 
 // Self interface implementation

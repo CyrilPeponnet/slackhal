@@ -43,7 +43,7 @@ Your plugin must implement the following interface:
 type Plugin interface {
   Init(Logger *zap.Logger, output chan<- *SlackResponse, bot *Bot)
   GetMetadata() *Metadata
-  ProcessMessage(command string, message slack.Msg)
+  ProcessMessage(command string, message slack.Msg) bool
   Self() interface{}
 }
 ```
@@ -167,7 +167,7 @@ func (h *echo) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *echo) ProcessMessage(command string, message slack.Msg) {
+func (h *echo) ProcessMessage(command string, message slack.Msg) bool {
 
   if len(strings.Split(message.Text, " ")) == 1 {
     return
@@ -179,6 +179,7 @@ func (h *echo) ProcessMessage(command string, message slack.Msg) {
   // This is a test to implement tracking of message
   o.TrackerID = 42
   h.sink <- o
+  return true
 }
 
 // Self interface implementation

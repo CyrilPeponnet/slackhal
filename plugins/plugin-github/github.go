@@ -84,8 +84,9 @@ func (h *githook) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *githook) ProcessMessage(command string, message slack.Msg) {
+func (h *githook) ProcessMessage(command string, message slack.Msg) bool {
 	// Nothing to process
+	return false
 }
 
 // init function that will register your plugin to the plugin manager

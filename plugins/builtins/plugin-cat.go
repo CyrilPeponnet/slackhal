@@ -30,7 +30,7 @@ func (h *cat) GetMetadata() *plugin.Metadata {
 }
 
 // ProcessMessage interface implementation
-func (h *cat) ProcessMessage(command string, message slack.Msg) {
+func (h *cat) ProcessMessage(command string, message slack.Msg) bool {
 	// Cat summoned !
 	o := new(plugin.SlackResponse)
 	o.Channel = message.Channel
@@ -42,6 +42,7 @@ func (h *cat) ProcessMessage(command string, message slack.Msg) {
 	}
 	h.sink <- o
 	defer response.Body.Close() // nolint
+	return true
 }
 
 // Self interface implementation

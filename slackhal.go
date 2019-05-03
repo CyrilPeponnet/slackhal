@@ -22,6 +22,8 @@ import (
 
 var bot plugin.Bot
 
+var defaultAnswers = []string{"Sorry, I'm not sure what you mean by that."}
+
 func main() {
 
 	headline := "Slack HAL bot."
@@ -45,7 +47,9 @@ Options:
 \ \| |/ _  |/ __| |/ // /_/ / _  | |
 _\ \ | (_| | (__|   </ __  / (_| | |
 \__/_|\__,_|\___|_|\_\/ /_/ \__,_|_|
-                         Version 2.0`)
+                         Version 2.0
+
+`)
 
 	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
 	disabledPlugins := []string{}
@@ -91,7 +95,7 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 	zap.L().Info("Putting myself to the fullest possible use, which is all I think that any conscious entity can ever hope to do...")
 
 	// Init our plugins
-	initPLugins(disabledPlugins, viper.GetString("bot.httpHandlerPort"), output, &bot)
+	initPlugins(disabledPlugins, viper.GetString("bot.httpHandlerPort"), output, &bot)
 
 	// Initialize our message tracker
 	bot.Tracker.Init()
@@ -116,16 +120,16 @@ Loop:
 		case *slack.MessageEvent:
 			zap.L().Debug("Message event received", zap.Reflect("event", ev))
 			// Discard messages coming from myself or bots
-			if ev.User == bot.ID {
+			if ev.SubType == "bot_message" || ev.User == bot.ID {
 				continue
 			}
-			for _, bot := range bot.RTM.GetInfo().Bots {
-				if ev.BotID == bot.ID {
-					continue Loop
+			if ev.SubType == "message_changed" {
+				if ev.SubMessage.SubType == "bot_message" || ev.SubMessage.User == bot.ID {
+					continue
 				}
 			}
 
-			go DispatchMessage(viper.GetString("bot.trigger"), ev)
+			go DispatchMessage(viper.GetString("bot.trigger"), ev, output)
 
 		case *slack.AckMessage:
 			bot.Tracker.UpdateTracking(ev)
@@ -154,6 +158,12 @@ Loop:
 
 		case *slack.LatencyReport:
 			// zap.L().Debugf("Current latency: %v", ev.Value)
+
+		case *slack.ReactionAddedEvent:
+			// if reaction added on our message
+
+		case *slack.ReactionRemovedEvent:
+			// If reaction removed on our message
 
 		default:
 			// ingore other events
