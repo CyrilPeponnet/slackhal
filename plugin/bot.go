@@ -1,146 +1,298 @@
 package plugin
 
 import (
-	"github.com/nlopes/slack"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/karlseguin/ccache"
+	"github.com/slack-go/slack"
+	"go.uber.org/zap"
 )
 
 // Bot is the bot structure
 type Bot struct {
-	API             *slack.Client
-	RTM             *slack.RTM
-	Name            string
-	ID              string
-	Tracker         TrackerManager
-	cachedChannels  map[string]slack.Channel
-	cachedGroups    map[string]slack.Group
-	cachedIM        map[string]slack.IM
-	cachedUserInfos map[string]slack.User
+	API              *slack.Client
+	RTM              *slack.RTM
+	Name             string
+	ID               string
+	Tracker          TrackerManager
+	cachedUserInfos  *ccache.Cache
+	cachedUserChans  *ccache.Cache
+	cachedChanInfos  *ccache.Cache
+	cachedGroupInfos *ccache.Cache
 }
 
-// WarmUpCaches fill the caches
-func (s *Bot) WarmUpCaches() {
-	_ = s.GetChannelByName("")
-	_ = s.GetIMChannelByUser("")
-	_ = s.GetGroupByName("")
-	_ = s.GetUserInfos("")
+// FeatureType represent a feature
+type FeatureType int
+
+// Represent Types
+const (
+	TypePublicChannel FeatureType = iota
+	TypePrivateChannel
+	TypeGroup
+	TypeUser
+	TypeLink
+)
+
+// MessageFeature is a message feature
+type MessageFeature struct {
+	Type  FeatureType
+	Value interface{}
+	ID    string
 }
 
-// GetNameFromID return a name from an ID
-func (s *Bot) GetNameFromID(id string) (name string) {
-	name = s.getNameFromID(id)
-	if name == "" {
-		s.WarmUpCaches()
-		name = s.getNameFromID(id)
-
+// String representation of a feature
+func (m MessageFeature) String() string {
+	switch m.Type {
+	case TypePublicChannel:
+		return fmt.Sprintf("<#%s>", m.ID)
+	case TypePrivateChannel:
+		return fmt.Sprintf("<#%s>", m.Value.(slack.Channel).ID)
+	case TypeGroup:
+		return fmt.Sprintf("<!subteam^%s>", m.ID)
+	case TypeUser:
+		return fmt.Sprintf("<@%s>", m.ID)
+	case TypeLink:
+		return fmt.Sprintf("<%s|%s>", m.ID, m.Value.(string))
 	}
-	return name
+	return ""
 }
 
-// getNameFromID return a name from an ID using cache
-func (s *Bot) getNameFromID(id string) (name string) {
-	switch string(id[0]) {
-	// Channels
-	case "C":
-		for _, channel := range s.cachedChannels {
-			if channel.ID == id {
-				return channel.Name
+// ExtractFeaturesFromMessage extract feature from a message
+func (s *Bot) ExtractFeaturesFromMessage(message string) (features []MessageFeature) {
+	r := regexp.MustCompile(`<(.*?)>`)
+	matches := r.FindAllStringSubmatch(message, -1)
+	for _, m := range matches {
+		switch {
+		// Channel
+		case strings.HasPrefix(m[1], "#C"):
+			c := strings.Split(m[1], "|")[0]
+			ci, err := s.GetCachedChanInfos(c[1:])
+			if err != nil {
+				continue
+			}
+			features = append(features, MessageFeature{
+				Type:  TypePublicChannel,
+				Value: ci,
+				ID:    ci.ID,
+			})
+			// User
+		case strings.HasPrefix(m[1], "#U") || strings.HasPrefix(m[1], "#W"):
+			u := strings.Split(m[1], "|")[0]
+			ui, err := s.GetCachedUserInfos(u[1:])
+			if err != nil {
+				continue
+			}
+			features = append(features, MessageFeature{
+				Type:  TypeUser,
+				Value: ui,
+				ID:    ui.ID,
+			})
+			// Group
+		case strings.HasPrefix(m[1], "!subteam^"):
+			g := strings.Split(m[1], "|")[0]
+			gi, err := s.GetCachedGroupInfos(g[9:])
+			if err != nil {
+				continue
+			}
+			features = append(features, MessageFeature{
+				Type:  TypeGroup,
+				Value: gi,
+				ID:    g[9:],
+			})
+		// Special
+		case strings.HasPrefix(m[1], "!"):
+			// regular link
+		default:
+			l := strings.Split(m[1], "|")
+			features = append(features, MessageFeature{
+				Type:  TypeLink,
+				Value: l[1],
+				ID:    l[0],
+			})
+		}
+	}
+
+	// Remove what matched
+	message = r.ReplaceAllString(message, "")
+
+	// Need to extract the private chan we may have set like #private-chan
+	// For that we need to check the chan of the bot. If the chan is in here we can create a features.
+	r = regexp.MustCompile(`#(\S+)`)
+	matches = r.FindAllStringSubmatch(message, -1)
+
+	if len(matches) > 0 {
+		// Try to retrieve private info through the bot chan list
+		myChans, err := s.GetCachedUserChans(s.ID)
+		if err != nil {
+			return features
+		}
+
+		for _, m := range matches {
+			for _, c := range myChans {
+				if c.Name == m[1] {
+					features = append(features, MessageFeature{
+						Type:  TypePrivateChannel,
+						Value: c,
+						ID:    c.ID,
+					})
+				}
 			}
 		}
-	// Groups
-	case "G":
-		for _, group := range s.cachedGroups {
-			if group.ID == id {
-				return group.Name
+	}
+
+	return features
+}
+
+// GetCachedUserChans retrieve the list of chans the user belongs to
+func (s *Bot) GetCachedUserChans(user string) ([]slack.Channel, error) {
+
+	if s.cachedUserChans == nil {
+		s.cachedUserChans = ccache.New(ccache.Configure().MaxSize(1000).ItemsToPrune(100))
+	}
+
+	items := s.cachedUserChans.Get(user)
+	var chans []slack.Channel
+
+	// If not set build it
+	if items == nil {
+
+		for {
+			p := slack.GetConversationsForUserParameters{
+				UserID:          user,
+				Types:           []string{"public_channel,private_channel"},
+				Limit:           0,
+				ExcludeArchived: true,
 			}
-		}
-	// Users
-	case "U", "W":
-		for _, user := range s.cachedUserInfos {
-			if user.ID == id {
-				return user.RealName
+
+			currentChans, n, err := s.API.GetConversationsForUser(&p)
+
+			if err != nil {
+				if rateLimitedError, ok := err.(*slack.RateLimitedError); ok {
+					zap.L().Debug("Reach rate limit on conversation.list, will backoff", zap.Error(err))
+					select {
+					case <-time.After(rateLimitedError.RetryAfter):
+						continue
+					}
+				} else {
+					zap.L().Error("Error while getting the chans", zap.Error(err))
+				}
 			}
+
+			chans = append(chans, currentChans...)
+			if n == "" {
+				s.cachedUserChans.Set(user, chans, 24*time.Hour)
+				return chans, nil
+			}
+
+			p.Cursor = n
+
 		}
+
 	}
-	return name
+
+	if chans, ok := items.Value().([]slack.Channel); ok {
+		return chans, nil
+	}
+	zap.L().Error("Error while casting cache to []slack.Channels")
+	return nil, fmt.Errorf("Error while casting cache to []slack.Channels")
+
 }
 
-// GetChannelByName - Find a channel by its name
-func (s *Bot) GetChannelByName(name string) (channel slack.Channel) {
-	if s.cachedChannels == nil {
-		s.cachedChannels = map[string]slack.Channel{}
+// MemberOf tell if a user is member of a channel
+func (s *Bot) MemberOf(channel, user string) bool {
+
+	chans, err := s.GetCachedUserChans(user)
+	if err != nil {
+		return false
 	}
-	channel = slack.Channel{}
-	if it, found := s.cachedChannels[name]; found {
-		return it
-	}
-	// Rebuild the cache
-	chans, _ := s.RTM.GetChannels(false)
-	s.cachedChannels = map[string]slack.Channel{}
-	for _, ch := range chans {
-		s.cachedChannels[ch.Name] = ch
-		if name == ch.Name {
-			channel = ch
+
+	for _, c := range chans {
+		if channel == c.ID {
+			return true
 		}
 	}
-	return channel
+
+	return false
+
 }
 
-// GetIMChannelByUser - Find a IM channel by username
-func (s *Bot) GetIMChannelByUser(user string) (im slack.IM) {
-	if s.cachedIM == nil {
-		s.cachedIM = map[string]slack.IM{}
-	}
-	im = slack.IM{}
-	if it, found := s.cachedIM[user]; found {
-		return it
-	}
-	// Rebuild the cache
-	chans, _ := s.RTM.GetIMChannels()
-	for _, ch := range chans {
-		s.cachedIM[ch.User] = ch
-		if ch.User == user {
-			im = ch
-		}
-	}
-	return im
-}
-
-// GetGroupByName - Find a group channel by name
-func (s *Bot) GetGroupByName(name string) (group slack.Group) {
-	if s.cachedGroups == nil {
-		s.cachedGroups = map[string]slack.Group{}
-	}
-	group = slack.Group{}
-	if it, found := s.cachedGroups[name]; found {
-		return it
-	}
-	// Rebuild the cache
-	chans, _ := s.RTM.GetGroups(false)
-	for _, ch := range chans {
-		s.cachedGroups[ch.Name] = ch
-		if ch.Name == name {
-			group = ch
-		}
-	}
-	return group
-}
-
-// GetUserInfos - Find user info for a username
-func (s *Bot) GetUserInfos(user string) (infos slack.User) {
+// GetCachedUserInfos - Find user info for a username
+func (s *Bot) GetCachedUserInfos(user string) (slack.User, error) {
 	if s.cachedUserInfos == nil {
-		s.cachedUserInfos = map[string]slack.User{}
+		s.cachedUserInfos = ccache.New(ccache.Configure().MaxSize(1000).ItemsToPrune(100))
 	}
-	if i, found := s.cachedUserInfos[user]; found {
-		return i
-	}
-	// Rebuild the cache
-	users, _ := s.RTM.GetUsers()
-	for _, u := range users {
-		s.cachedUserInfos[u.ID] = u
-		if u.ID == user {
-			infos = u
-		}
+	item := s.cachedUserInfos.Get(user)
 
+	// if item is nil get it from API
+	if item == nil {
+		infos, err := s.API.GetUserInfo(user)
+		if err != nil {
+			zap.L().Error("Error while getting user info", zap.String("user", user), zap.Error(err))
+			return slack.User{}, err
+		}
+		s.cachedUserInfos.Set(infos.ID, infos, 24*time.Hour)
+		return *infos, nil
 	}
-	return infos
+
+	if infos, ok := item.Value().(*slack.User); ok {
+		return *infos, nil
+	}
+
+	return slack.User{}, fmt.Errorf("Cannot cast cache item to slack.User")
+
+}
+
+// GetCachedChanInfos - Find user info for a chan
+func (s *Bot) GetCachedChanInfos(channel string) (slack.Channel, error) {
+	if s.cachedChanInfos == nil {
+		s.cachedChanInfos = ccache.New(ccache.Configure().MaxSize(1000).ItemsToPrune(100))
+	}
+	item := s.cachedChanInfos.Get(channel)
+
+	// if item is nil get it from API
+	if item == nil {
+		infos, err := s.API.GetConversationInfo(channel, true)
+		if err != nil {
+			zap.L().Error("Error while getting channel info", zap.String("channel", channel), zap.Error(err))
+			return slack.Channel{}, err
+		}
+		s.cachedChanInfos.Set(infos.ID, infos, 24*time.Hour)
+		return *infos, nil
+	}
+
+	if infos, ok := item.Value().(*slack.Channel); ok {
+		return *infos, nil
+	}
+
+	return slack.Channel{}, fmt.Errorf("Cannot cast cache item to slack.Channel")
+
+}
+
+// GetCachedGroupInfos - Find user info for a group
+func (s *Bot) GetCachedGroupInfos(group string) ([]string, error) {
+	if s.cachedGroupInfos == nil {
+		s.cachedGroupInfos = ccache.New(ccache.Configure().MaxSize(1000).ItemsToPrune(100))
+	}
+	members := s.cachedGroupInfos.Get(group)
+
+	// if members is nil get it from API
+	if members == nil {
+		infos, err := s.API.GetUserGroupMembers(group)
+		if err != nil {
+			zap.L().Error("Error while getting group info", zap.String("group", group), zap.Error(err))
+			return nil, err
+		}
+		s.cachedGroupInfos.Set(group, infos, 24*time.Hour)
+		return infos, nil
+	}
+
+	if infos, ok := members.Value().([]string); ok {
+		return infos, nil
+	}
+
+	return nil, fmt.Errorf("Cannot cast cache members to slack.UserGroup")
+
 }

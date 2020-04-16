@@ -28,7 +28,7 @@ Loading:
 			}
 		}
 		zap.L().Info("Loading", zap.String("plugin", meta.Name), zap.String("version", meta.Version))
-		p.Init(zap.L().Named(meta.Name), output, bot)
+		p.Init(output, bot)
 		// Register handlers if any
 		for route, handler := range meta.HTTPHandler {
 			handlers = true

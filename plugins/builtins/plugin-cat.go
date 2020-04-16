@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 )
 
 // cat struct define your plugin
@@ -19,7 +19,7 @@ type cat struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *cat) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *cat) Init(output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	// cats are initless
 	h.sink = output
 }
@@ -55,6 +55,6 @@ func init() {
 	cater := new(cat)
 	cater.Metadata = plugin.NewMetadata("cat")
 	cater.Description = "Show cats"
-	cater.ActiveTriggers = []plugin.Command{plugin.Command{Name: `cat`, ShortDescription: "Show a cat.", LongDescription: "Because cats are fun."}}
+	cater.ActiveTriggers = []plugin.Command{{Name: `cat`, ShortDescription: "Show a cat.", LongDescription: "Because cats are fun."}}
 	plugin.PluginManager.Register(cater)
 }

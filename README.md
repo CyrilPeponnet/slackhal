@@ -3,7 +3,7 @@
 ## Usage
 
 ```console
-Usage: slackhal [options] [--plugin-path path...]
+Usage: slackhal [options]
 
 Options:
   -h, --help               Show this help.
@@ -41,7 +41,7 @@ Your plugin must implement the following interface:
 
 ```go
 type Plugin interface {
-  Init(Logger *zap.Logger, output chan<- *SlackResponse, bot *Bot)
+  Init( output chan<- *SlackResponse, bot *Bot)
   GetMetadata() *Metadata
   ProcessMessage(command string, message slack.Msg) bool
   Self() interface{}
@@ -62,7 +62,7 @@ Must return a `plugin.Metadata` struct. This is used to register you plugin.
 
 ### The `ProcessMessage` function
 
-Will be called when an action or a trigger is found in an incoming message. You can check `slack.Msg` type [here](https://godoc.org/github.com/nlopes/slack#Msg).
+Will be called when an action or a trigger is found in an incoming message. You can check `slack.Msg` type [here](https://godoc.org/github.com/slack-go/slack#Msg).
 
 To send your response you can send `*plugin.SlackResponse` instances to the `output` channel provided by `Init` above.
 
@@ -116,7 +116,7 @@ func init() {
   loggerer := new(logger)
   loggerer.Metadata = plugin.NewMetadata("logger")
   loggerer.Description = "Logger messages"
-  loggerer.PassiveTriggers = []plugin.Command{plugin.Command{Name: `(?s:.*)`, ShortDescription: "Log everything", LongDescription: "Will intercept all messages to log them."}}
+  loggerer.PassiveTriggers = []plugin.Command{{Name: `(?s:.*)`, ShortDescription: "Log everything", LongDescription: "Will intercept all messages to log them."}}
   plugin.PluginManager.Register(loggerer)
 }
 ```
@@ -146,7 +146,7 @@ import (
   "go.uber.org/zap"
 
   "github.com/CyrilPeponnet/slackhal/plugin"
-  "github.com/nlopes/slack"
+  "github.com/slack-go/slack"
 )
 
 // echo struct define your plugin
@@ -157,7 +157,7 @@ type echo struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *echo) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *echo) Init( output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
   h.sink = output
 }
 
@@ -192,7 +192,7 @@ func init() {
   echoer := new(echo)
   echoer.Metadata = plugin.NewMetadata("echo")
   echoer.Description = "Will repeat what you said"
-  echoer.ActiveTriggers = []plugin.Command{plugin.Command{Name: "echo", ShortDescription: "Parrot style", LongDescription: "Will repeat what you put after."}}
+  echoer.ActiveTriggers = []plugin.Command{{Name: "echo", ShortDescription: "Parrot style", LongDescription: "Will repeat what you put after."}}
   plugin.PluginManager.Register(echoer)
 }
 ```
@@ -275,7 +275,7 @@ Be sure to set the `Channel field` (you can take it from `message.Channel`).
 
 The `TrackerID` is used if you want to edit sent message later. Your plugin must set the `trackerID` with a positive integer that will be used as an identifier to edit the message later. The `TrackedTTL` field is used to set a TTL of tracking. If you send two `SlackResponse` with the same `TrackerID`, it will edit the message instead of posting a new one.
 
-The `Options` field is used to set your message options as described [here](https://godoc.org/github.com/nlopes/slack#MsgOption).
+The `Options` field is used to set your message options as described [here](https://godoc.org/github.com/slack-go/slack#MsgOption).
 
 You can find details for advanced attachments formatting [here](https://api.slack.com/docs/message-attachments).
 

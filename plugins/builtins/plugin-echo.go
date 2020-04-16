@@ -3,10 +3,8 @@ package builtins
 import (
 	"strings"
 
-	"go.uber.org/zap"
-
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 )
 
 // echo struct define your plugin
@@ -17,7 +15,7 @@ type echo struct {
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *echo) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *echo) Init(output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.sink = output
 }
 
@@ -59,6 +57,6 @@ func init() {
 	echoer := new(echo)
 	echoer.Metadata = plugin.NewMetadata("echo")
 	echoer.Description = "Will repeat what you said"
-	echoer.ActiveTriggers = []plugin.Command{plugin.Command{Name: "echo", ShortDescription: "Parrot style", LongDescription: "Will repeat what you put after."}}
+	echoer.ActiveTriggers = []plugin.Command{{Name: "echo", ShortDescription: "Parrot style", LongDescription: "Will repeat what you put after."}}
 	plugin.PluginManager.Register(echoer)
 }

@@ -2,13 +2,12 @@ package builtins
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"regexp"
 
-	"go.uber.org/zap"
+	"github.com/spf13/viper"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 )
 
 // help struct define your plugin
@@ -22,17 +21,17 @@ func init() {
 	helper := new(help)
 	helper.Metadata = plugin.NewMetadata("help")
 	helper.Metadata.Description = "Helper plugin."
-	helper.ActiveTriggers = []plugin.Command{plugin.Command{Name: "help", ShortDescription: "Will provide some help :)"},
-		plugin.Command{Name: "list-plugins", ShortDescription: "List all enabled plugins."},
-		plugin.Command{Name: "list-commands", ShortDescription: "List all available commands."},
-		plugin.Command{Name: "list-handlers", ShortDescription: "List all available HTTP handlers."},
-		plugin.Command{Name: "list-triggers", ShortDescription: "List all passive triggers."}}
+	helper.ActiveTriggers = []plugin.Command{{Name: "help", ShortDescription: "Will provide some help :)"},
+		{Name: "list-plugins", ShortDescription: "List all enabled plugins."},
+		{Name: "list-commands", ShortDescription: "List all available commands."},
+		{Name: "list-handlers", ShortDescription: "List all available HTTP handlers."},
+		{Name: "list-triggers", ShortDescription: "List all passive triggers."}}
 	plugin.PluginManager.Register(helper)
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *help) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *help) Init(output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.sink = output
 }
 
@@ -63,7 +62,7 @@ func (h *help) ProcessMessage(command string, message slack.Msg) bool {
 	case command == "list-triggers":
 		o.Options = append(o.Options, slack.MsgOptionText(PluginListTriggers(), false))
 	}
-	o.Channel = message.User
+	o.Channel = message.Channel
 	h.sink <- o
 	return true
 }

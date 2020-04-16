@@ -6,6 +6,14 @@ import (
 	"github.com/asdine/storm"
 )
 
+// fact struct
+type fact struct {
+	Name                 string `storm:"id"`
+	Patterns             []string
+	Content              string
+	RestrictToChannelsID []string
+}
+
 // factStorer interface
 type factStorer interface {
 	Connect(string) error
@@ -60,12 +68,7 @@ func (s *stormDB) FindFact(message string) *fact {
 	if err == nil {
 		for _, f := range factList {
 			for _, p := range f.Patterns {
-				//TODO: Not really optmized.
-				m := strings.ToLower(message)
-				if p == m ||
-					strings.HasPrefix(m, p) ||
-					strings.HasSuffix(m, p) ||
-					strings.Contains(m, " "+p+" ") {
+				if strings.Contains(strings.ToLower(message), strings.ToLower(p)) {
 					return &f
 				}
 			}

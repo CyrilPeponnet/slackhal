@@ -10,26 +10,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 )
 
 // DispatchResponses will process responses from the channel
 func DispatchResponses(output chan *plugin.SlackResponse, bot *plugin.Bot) {
 
 	for msg := range output {
-
-		if strings.HasPrefix(msg.Channel, "U") {
-			msg.Channel = bot.GetIMChannelByUser(msg.Channel).ID
-		} else if strings.HasPrefix(msg.Channel, "#") {
-			// try chan
-			channel := bot.GetChannelByName(msg.Channel[1:len(msg.Channel)])
-			id := channel.ID
-			if id == "" {
-				channel := bot.GetGroupByName(msg.Channel[1:len(msg.Channel)])
-				id = channel.ID
-			}
-			msg.Channel = id
-		}
 
 		switch {
 
@@ -52,11 +39,11 @@ func DispatchResponses(output chan *plugin.SlackResponse, bot *plugin.Bot) {
 				}
 			} else {
 				// Else post message
-				c, t, e := bot.RTM.PostMessage(msg.Channel, msg.Options...)
+				_, t, e := bot.RTM.PostMessage(msg.Channel, msg.Options...)
 				if e != nil {
 					zap.L().Error("Error while sending message", zap.Error(e))
 				} else {
-					zap.L().Debug("Sent message", zap.String("channel", c))
+					// zap.L().Debug("Sent message", zap.String("channel", c))
 					// If the message need to be tracked
 					if msg.TrackerID != 0 && bot.Tracker.GetTimeStampFor(msg.TrackerID) == "" {
 						bot.Tracker.Track(plugin.Tracker{TrackerID: msg.TrackerID, TimeStamp: t, TTL: 300})
@@ -83,9 +70,37 @@ func checkForCommand(text string, command string) bool {
 func DispatchMessage(prefix string, msg *slack.MessageEvent, output chan *plugin.SlackResponse) {
 
 	// Check if this is an edited message
+	// if so fill up as if it was a message
 	if msg.SubType == "message_changed" {
 		msg.Msg.Text = msg.SubMessage.Text
 		msg.User = msg.SubMessage.User
+	}
+
+	// Build our authz context once if not set
+	userChansID := []string{}
+	ch, err := bot.GetCachedUserChans(msg.User)
+	if err != nil {
+		return
+	}
+	for _, c := range ch {
+		userChansID = append(userChansID, c.ID)
+	}
+
+	userInfo, err := bot.GetCachedUserInfos(msg.User)
+	if err != nil {
+		return
+	}
+
+	// Every direct message goes through the autorizer chat handler
+	// This is where the rbac is configured before plugins are called
+	if strings.HasPrefix(msg.Channel, "D") {
+		if response := AuthzHandleChat(msg); response != "" {
+			o := new(plugin.SlackResponse)
+			o.Channel = msg.Msg.Channel
+			o.Options = append(o.Options, slack.MsgOptionText(response, false))
+			output <- o
+			return
+		}
 	}
 
 	message := msg.Msg
@@ -113,6 +128,16 @@ func DispatchMessage(prefix string, msg *slack.MessageEvent, output chan *plugin
 					if strings.Contains(message.Text, prefix+c.Name) ||
 						(strings.HasPrefix(message.Text, fmt.Sprintf("<@%v> ", bot.ID)) && checkForCommand(message.Text, c.Name)) ||
 						(strings.HasPrefix(msg.Channel, "D") && strings.HasPrefix(strings.ToLower(message.Text), c.Name)) {
+
+						// Check context authorization
+						if !authz.IsGranted(c.Name, msg.User, msg.Channel, userChansID...) {
+							o := new(plugin.SlackResponse)
+							o.Channel = msg.Msg.Channel
+							o.Options = append(o.Options, slack.MsgOptionText(fmt.Sprintf("I'm sorry, %s I'm afraid I can't do that.", userInfo.RealName), false))
+
+							output <- o
+							return
+						}
 
 						zap.L().Debug("Dispatching to active plugin", zap.String("plugin", info.Name), zap.String("command", c.Name))
 						// Replace our prefixed action with the action
@@ -148,8 +173,8 @@ func DispatchMessage(prefix string, msg *slack.MessageEvent, output chan *plugin
 
 		}
 
-		// If I was mentioned or in dm and nothing matched send a reponse
-		// From our default reponse list.
+		// If I was mentioned or in dm and nothing matched send a response
+		// From our default response list.
 		if (mentionned || strings.HasPrefix(msg.Channel, "D")) && !replied {
 			rand.Seed(time.Now().Unix())
 			o := new(plugin.SlackResponse)

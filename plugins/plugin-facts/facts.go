@@ -1,11 +1,13 @@
 package pluginfacts
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
+	"text/template"
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -13,19 +15,17 @@ import (
 // logger struct define your plugin
 type facts struct {
 	plugin.Metadata
-	Logger        *zap.Logger
 	sink          chan<- *plugin.SlackResponse
-	learner       *learn
 	factDB        factStorer
+	bot           *plugin.Bot
 	configuration *viper.Viper
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *facts) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
-	h.Logger = Logger
+func (h *facts) Init(output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 	h.sink = output
-	h.learner = new(learn)
+	h.bot = bot
 	h.configuration = viper.New()
 	h.configuration.AddConfigPath("/etc/slackhal/")
 	h.configuration.AddConfigPath("$HOME/.slackhal")
@@ -34,7 +34,7 @@ func (h *facts) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bo
 	h.configuration.SetConfigType("yaml")
 	err := h.configuration.ReadInConfig()
 	if err != nil {
-		h.Logger.Error("Not able to read configuration for facts plugin.", zap.Error(err))
+		zap.L().Error("Not able to read configuration for facts plugin.", zap.Error(err))
 		h.Disabled = true
 		return
 	}
@@ -42,7 +42,7 @@ func (h *facts) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bo
 	h.factDB = new(stormDB)
 	err = h.factDB.Connect(dbPath)
 	if err != nil {
-		h.Logger.Error("Error while opening the facts database!", zap.Error(err))
+		zap.L().Error("Error while opening the facts database!", zap.Error(err))
 		h.Disabled = true
 		return
 	}
@@ -68,37 +68,59 @@ func (h *facts) simpleResponse(message slack.Msg, text string) {
 func (h *facts) ProcessMessage(command string, message slack.Msg) bool {
 
 	switch command {
-	case cmdnew:
-		currentFact := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdnew)+len(cmdnew) : len(message.Text)])
-		if h.factDB.FindFactByName(currentFact) != nil {
-			h.simpleResponse(message, "I'm afraid I cannot do that. There is already a fact registered with that name.")
-		}
-		h.simpleResponse(message, h.learner.New(message))
-	case cmdcancel:
-		h.simpleResponse(message, h.learner.Cancel(message))
-	case cmdedit:
-		name := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdedit)+len(cmdedit) : len(message.Text)])
-		foundFact := h.factDB.FindFactByName(name)
-		if foundFact != nil {
-			msg := fmt.Sprintf("Found a fact for _%v_\n", name)
-			msg += fmt.Sprintf("Current content is: \n>_%v_\n", foundFact.Content)
-			msg += fmt.Sprintf("Currents patterns are\n> _%v_\n", strings.Join(foundFact.Patterns, " || "))
-			channels := "all"
-			if len(foundFact.RestrictToChannelsID) > 0 {
-				channels = ""
-				for _, rc := range foundFact.RestrictToChannelsID {
-					channels += fmt.Sprintf("<#%v> ", rc)
-				}
-			}
-			msg += fmt.Sprintf("Current channel scope is \n> _%v_\n", channels)
-			msg += "Relearning this fact now!"
-			h.simpleResponse(message, msg)
-			// HACK to learn a known fact
-			message.Text = strings.Replace(message.Text, cmdedit, cmdnew, 1)
-			h.simpleResponse(message, h.learner.New(message))
+	case cmdNew, cmdUpdate:
+		var text string
+
+		if command == cmdNew {
+			text = strings.TrimSpace(message.Text[strings.Index(message.Text, cmdNew)+len(cmdNew) : len(message.Text)])
 		} else {
-			h.simpleResponse(message, fmt.Sprintf("Sorry cannot find a fact with name _%v_", name))
+			text = strings.TrimSpace(message.Text[strings.Index(message.Text, cmdUpdate)+len(cmdUpdate) : len(message.Text)])
 		}
+
+		f := fact{}
+		// Split our command in to 4 parts we are looking for tokens AS WHEN and IN
+		parts := strings.Split(text, "/as")
+		if len(parts) != 2 {
+			h.simpleResponse(message, "A fact must have the from `my fact /as my content /when this /or that [/in #chan1 #chan2]")
+			return false
+		}
+
+		f.Name = strings.TrimSpace(parts[0])
+
+		parts = strings.Split(parts[1], "/when")
+		if len(parts) != 2 {
+			h.simpleResponse(message, "A fact must have the from `my fact /as my content /when this /or that [/in #chan1 #chan2]")
+			return false
+		}
+
+		f.Content = strings.TrimSpace(parts[0])
+
+		parts = strings.Split(parts[1], "/in")
+
+		p := strings.Split(parts[0], "/or")
+		for _, i := range p {
+			f.Patterns = append(f.Patterns, strings.TrimSpace(i))
+		}
+
+		if len(parts) == 2 {
+			c := h.bot.ExtractFeaturesFromMessage(parts[1])
+			for _, i := range c {
+				f.RestrictToChannelsID = append(f.RestrictToChannelsID, i.ID)
+			}
+		}
+
+		if h.factDB.FindFactByName(f.Name) != nil && command == cmdNew {
+			h.simpleResponse(message, "I'm afraid I cannot do that. There is already a fact registered with that name.")
+			return false
+		}
+
+		if err := h.factDB.AddFact(&f); err != nil {
+			zap.L().Error("Failed to save fact", zap.Error(err))
+			h.simpleResponse(message, "I'm afraid I cannot do that. Something went wrong.")
+		}
+
+		h.simpleResponse(message, "Thanks, I will remember that.")
+
 	case cmddel:
 		name := strings.TrimSpace(message.Text[strings.Index(message.Text, cmddel)+len(cmddel) : len(message.Text)])
 		foundFact := h.factDB.FindFactByName(name)
@@ -112,25 +134,37 @@ func (h *facts) ProcessMessage(command string, message slack.Msg) bool {
 		} else {
 			h.simpleResponse(message, fmt.Sprintf("Sorry cannot find a fact with name _%v_", name))
 		}
+
 	case cmdlist:
+
 		factsList, err := h.factDB.ListFacts()
 		if err != nil {
-			h.Logger.Error("Error while getting facts", zap.Error(err))
+			zap.L().Error("Error while getting facts", zap.Error(err))
 			return false
 		}
+
 		content := "Here is the facts I know:\n"
-		for _, f := range factsList {
-			content += fmt.Sprintf("\n>%v", f.Name)
-			channels := "all channels"
-			if len(f.RestrictToChannelsID) > 0 {
-				channels = ""
-				for _, rc := range f.RestrictToChannelsID {
-					channels += fmt.Sprintf("<#%v> ", rc)
-				}
-			}
-			content += fmt.Sprintf(" _Channel scope %v_", channels)
+
+		tpl := `
+{{- range .}}
+• {{.Name}} */as* {{ .Content }} */when* {{ Join .Patterns " */or* " }} {{- if .RestrictToChannelsID}} */in* {{ range .RestrictToChannelsID}}<#{{.}}> {{ end }} {{- end }}
+{{- end}}
+`
+		t, err := template.New("output").Funcs(template.FuncMap{"Join": strings.Join}).Parse(tpl)
+		if err != nil {
+			zap.L().Error("Error while parsing template", zap.Error(err))
+			return false
 		}
-		h.simpleResponse(message, content)
+
+		buf := new(bytes.Buffer)
+		err = t.Execute(buf, factsList)
+		if err != nil {
+			zap.L().Error("Error while rendering template", zap.Error(err))
+			return false
+		}
+
+		h.simpleResponse(message, content+buf.String())
+
 	case cmdremind:
 		mentionned := strings.TrimSpace(message.Text[strings.Index(message.Text, cmdremind)+len(cmdremind) : len(message.Text)])
 		foundFact := h.factDB.FindFact(message.Text)
@@ -153,18 +187,6 @@ func (h *facts) ProcessMessage(command string, message slack.Msg) bool {
 					return true
 				}
 			}
-		}
-		// continue learning if any
-		f, r := h.learner.Learn(message)
-		h.simpleResponse(message, r)
-		if f.Name != "" {
-			if err := h.factDB.AddFact(&f); err == nil {
-				h.simpleResponse(message, fmt.Sprintf("I now know %v facts.", h.factDB.NumberOfFacts()))
-			} else {
-				h.simpleResponse(message, "UhOh something bad happened.")
-				h.Logger.Error("Error while adding facto to db", zap.Error(err))
-			}
-			return true
 		}
 		return false
 	}
@@ -193,10 +215,9 @@ func (h *facts) Self() (i interface{}) {
 
 // Cmds are const for the package.
 const (
-	cmdnew    = "new-fact"
-	cmdcancel = "stop-learning"
+	cmdNew    = "new-fact"
+	cmdUpdate = "update-fact"
 	cmdlist   = "list-facts"
-	cmdedit   = "edit-fact"
 	cmddel    = "remove-fact"
 	cmdremind = "tell-fact"
 )
@@ -207,12 +228,11 @@ func init() {
 	learner.Metadata = plugin.NewMetadata("facts")
 	learner.Description = "Tell facts given patterns."
 	learner.ActiveTriggers = []plugin.Command{
-		plugin.Command{Name: cmdnew, ShortDescription: "Start a learning session.", LongDescription: "Will start a learning session to add new facts."},
-		plugin.Command{Name: cmdcancel, ShortDescription: "Stop a learning session.", LongDescription: "Will stop a current learning session"},
-		plugin.Command{Name: cmdlist, ShortDescription: "List all learned facts.", LongDescription: "Will list all the registered facts."},
-		plugin.Command{Name: cmdremind, ShortDescription: "Tell someone about a fact.", LongDescription: "Will metion a person with the content of a fact."},
-		plugin.Command{Name: cmdedit, ShortDescription: "Edit a given fact.", LongDescription: "Allow you to edit registered facts."},
-		plugin.Command{Name: cmddel, ShortDescription: "Remove a given fact.", LongDescription: "Allow you to remove a registered fact."}}
-	learner.PassiveTriggers = []plugin.Command{plugin.Command{Name: `(?s:.*)`, ShortDescription: "Look for facts", LongDescription: "Will look for registered facts to replay."}}
+		{Name: cmdNew, ShortDescription: "Add a fact.", LongDescription: "Will add a fact must follow the form `new-fact a fact name /as a fact content /when this will trigger /or this will also trigger [/in #chan1 #chan2]`."},
+		{Name: cmdUpdate, ShortDescription: "Update a fact.", LongDescription: "Will update a fact must follow the form `new-fact a fact name /as a fact content /when this will trigger /or this will also trigger [/in #chan1 #chan2]`."},
+		{Name: cmdlist, ShortDescription: "List all learned facts.", LongDescription: "Will list all the registered facts."},
+		{Name: cmdremind, ShortDescription: "Tell someone about a fact.", LongDescription: "Will metion a person with the content of a fact."},
+		{Name: cmddel, ShortDescription: "Remove a given fact.", LongDescription: "Allow you to remove a registered fact."}}
+	learner.PassiveTriggers = []plugin.Command{{Name: `(?s:.*)`, ShortDescription: "Look for facts", LongDescription: "Will look for registered facts to replay."}}
 	plugin.PluginManager.Register(learner)
 }

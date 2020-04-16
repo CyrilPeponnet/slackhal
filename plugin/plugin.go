@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"go.uber.org/zap"
-
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 )
 
 // Metadata struct
@@ -54,7 +52,7 @@ type SlackResponse struct {
 
 // Plugin Interface
 type Plugin interface {
-	Init(Logger *zap.Logger, output chan<- *SlackResponse, bot *Bot)
+	Init(output chan<- *SlackResponse, bot *Bot)
 	GetMetadata() *Metadata
 	ProcessMessage(command string, message slack.Msg) bool
 	Self() interface{}

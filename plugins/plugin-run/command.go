@@ -10,7 +10,7 @@ import (
 
 	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/fsnotify/fsnotify"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -19,7 +19,6 @@ import (
 type run struct {
 	plugin.Metadata
 	bot           *plugin.Bot
-	Logger        *zap.Logger
 	sink          chan<- *plugin.SlackResponse
 	commands      []command
 	configuration *viper.Viper
@@ -27,20 +26,19 @@ type run struct {
 
 // Repository struct
 type command struct {
-	Name         string
-	Description  string
-	Command      []string
-	AllowedUsers []string
+	Name        string
+	Description string
+	Command     []string
 }
 
 func (h *run) ReloadConfiguration() {
 
 	err := h.configuration.ReadInConfig()
 	if err != nil {
-		h.Logger.Error("Not able to read configuration for run plugin.", zap.Error(err))
+		zap.L().Error("Not able to read configuration for run plugin.", zap.Error(err))
 	} else {
 		if err := h.configuration.UnmarshalKey("Commands", &h.commands); err != nil {
-			h.Logger.Error("Error while reading configuration", zap.Error(err))
+			zap.L().Error("Error while reading configuration", zap.Error(err))
 		}
 	}
 
@@ -50,22 +48,16 @@ func (h *run) ReloadConfiguration() {
 	for _, command := range h.commands {
 
 		h.ActiveTriggers = append(h.ActiveTriggers, plugin.Command{
-			Name: command.Name,
-			ShortDescription: command.Description + func() string {
-				if len(command.AllowedUsers) > 0 {
-					return fmt.Sprintf(" (restricted to %d users)", len(command.AllowedUsers))
-				}
-				return ""
-			}(),
+			Name:             command.Name,
+			ShortDescription: command.Description,
 		})
 	}
 }
 
 // Init interface implementation if you need to init things
 // When the bot is starting.
-func (h *run) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
+func (h *run) Init(output chan<- *plugin.SlackResponse, bot *plugin.Bot) {
 
-	h.Logger = Logger
 	h.bot = bot
 	h.sink = output
 	h.configuration = viper.New()
@@ -81,7 +73,7 @@ func (h *run) Init(Logger *zap.Logger, output chan<- *plugin.SlackResponse, bot 
 	// Handle live reload
 	h.configuration.WatchConfig()
 	h.configuration.OnConfigChange(func(e fsnotify.Event) {
-		h.Logger.Info("Reloading commands configuration file.")
+		zap.L().Info("Reloading commands configuration file.")
 		h.ReloadConfiguration()
 	})
 }
@@ -123,7 +115,7 @@ func (h *run) processCommand(message slack.Msg, cmd command, args []string, user
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
-	h.Logger.Debug("Run command", zap.String("command", command), zap.Strings("args", args))
+	zap.L().Debug("Run command", zap.String("command", command), zap.Strings("args", args))
 	c := exec.CommandContext(ctx, command, args...)
 
 	// Set some en var for scripts
@@ -160,7 +152,7 @@ func (h *run) processCommand(message slack.Msg, cmd command, args []string, user
 		_, err := h.bot.RTM.UploadFile(f)
 		if err != nil {
 
-			h.Logger.Error("Failed to upload file", zap.Error(err))
+			zap.L().Error("Failed to upload file", zap.Error(err))
 			r.Options = []slack.MsgOption{slack.MsgOptionText("Uhoh, something went wrong while uploading the file.", false)}
 
 		} else {
@@ -180,7 +172,11 @@ func (h *run) processCommand(message slack.Msg, cmd command, args []string, user
 // ProcessMessage interface implementation
 func (h *run) ProcessMessage(cmd string, message slack.Msg) bool {
 
-	user := h.bot.GetUserInfos(message.User)
+	user, err := h.bot.GetCachedUserInfos(message.User)
+	if err != nil {
+		return false
+	}
+
 	cmdArgs := strings.Split(message.Text, " ")
 
 	// Locate args if any, they are after the command
@@ -199,36 +195,12 @@ func (h *run) ProcessMessage(cmd string, message slack.Msg) bool {
 
 		if command.Name == cmd {
 
-			if isAuthorized(user, command.AllowedUsers) {
-				h.Logger.Debug("Authorized user", zap.String("email", user.Profile.Email))
-				h.processCommand(message, command, cmdArgs, user)
-
-			} else {
-				h.Logger.Debug("Unathorized user", zap.String("email", user.Profile.Email))
-				r := new(plugin.SlackResponse)
-				r.Channel = message.Channel
-				r.Options = append(r.Options, slack.MsgOptionText("Just what do you think you're doing?", false))
-				h.sink <- r
-			}
+			h.processCommand(message, command, cmdArgs, user)
 
 			return true
 		}
 	}
 
-	return false
-}
-
-func isAuthorized(user slack.User, users []string) bool {
-
-	if len(users) > 0 {
-		for _, authzUser := range users {
-			if authzUser == user.Profile.Email {
-				return true
-			}
-		}
-	} else {
-		return true
-	}
 	return false
 }
 
@@ -238,6 +210,6 @@ func init() {
 	runner := new(run)
 	runner.Metadata = plugin.NewMetadata("Runner")
 	runner.Description = "Run commands."
-	runner.ActiveTriggers = []plugin.Command{plugin.Command{Name: `run`, ShortDescription: "Run a command.", LongDescription: "Run commands."}}
+	runner.ActiveTriggers = []plugin.Command{{Name: `run`, ShortDescription: "Run a command.", LongDescription: "Run commands."}}
 	plugin.PluginManager.Register(runner)
 }

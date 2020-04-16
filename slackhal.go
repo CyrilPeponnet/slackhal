@@ -2,14 +2,16 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"go.uber.org/zap"
 
+	"github.com/CyrilPeponnet/slackhal/pkg/authorizer"
 	"github.com/CyrilPeponnet/slackhal/pkg/logutils"
 	"github.com/CyrilPeponnet/slackhal/plugin"
 	"github.com/docopt/docopt-go"
 	"github.com/fatih/color"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 	"github.com/spf13/viper"
 
 	_ "github.com/CyrilPeponnet/slackhal/plugins/builtins"
@@ -22,6 +24,8 @@ import (
 
 var bot plugin.Bot
 
+var authz authorizer.Authorizer
+
 var defaultAnswers = []string{"Sorry, I'm not sure what you mean by that."}
 
 func main() {
@@ -31,7 +35,7 @@ func main() {
 
 This is another slack bot.
 
-Usage: slackhal [options] [--plugin-path path...]
+Usage: slackhal [options]
 
 Options:
 	-h, --help               Show this help.
@@ -51,7 +55,7 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 
 `)
 
-	args, _ := docopt.Parse(headline+usage, nil, true, "Slack HAL bot 1.0", true)
+	args, _ := docopt.ParseDoc(headline + usage)
 	disabledPlugins := []string{}
 
 	// Load configuration file and override some args if needed.
@@ -84,6 +88,12 @@ _\ \ | (_| | (__|   </ __  / (_| | |
 		zap.L().Fatal("You need to set the slack bot token!")
 	}
 
+	// Init our authorizer
+	err := authz.Init(os.ExpandEnv("$HOME/.slackhal/authz.db"))
+	if err != nil {
+		zap.L().Fatal("Cannot initialize the authorizer", zap.Error(err))
+	}
+
 	bot.API = slack.New(viper.GetString("bot.token"))
 	bot.RTM = bot.API.NewRTM()
 
@@ -114,11 +124,9 @@ Loop:
 			bot.Name = info.User.Name
 			bot.ID = info.User.ID
 			zap.L().Info("Connected", zap.String("name", bot.Name), zap.String("id", bot.ID))
-			zap.L().Debug("Warming up caches for group and users.")
-			bot.WarmUpCaches()
 
 		case *slack.MessageEvent:
-			zap.L().Debug("Message event received", zap.Reflect("event", ev))
+			// zap.L().Debug("Message event received", zap.Reflect("event", ev))
 			// Discard messages coming from myself or bots
 			if ev.SubType == "bot_message" || ev.User == bot.ID {
 				continue
@@ -167,7 +175,7 @@ Loop:
 
 		default:
 			// ingore other events
-			zap.L().Debug("event", zap.Reflect("data", msg.Data))
+			// zap.L().Debug("event", zap.Reflect("data", msg.Data))
 		}
 	}
 }
