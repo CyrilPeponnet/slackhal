@@ -66,7 +66,7 @@ func AuthzHandleChat(msg *slack.MessageEvent) (response string) {
 			content := strings.Split(line, "withParent:")
 			var parents []string
 			if len(content) == 2 {
-				parents = strings.Split(content[1], ",")
+				parents = strings.Split(strings.TrimSpace(content[1]), ",")
 			}
 
 			aRole := strings.SplitN(content[0], " ", 2)
