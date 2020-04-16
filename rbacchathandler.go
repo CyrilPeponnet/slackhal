@@ -393,13 +393,21 @@ func AuthzHandleChat(msg *slack.MessageEvent) (response string) {
 			if err != nil {
 				return fmt.Sprintf("Error while creating the rbac role: %s", err.Error())
 			}
+			err = authz.AddRole("owner", "Owner role")
+			if err != nil {
+				return fmt.Sprintf("Error while creating the owner role: %s", err.Error())
+			}
+			err = authz.AttachPermission("*", "owner")
+			if err != nil {
+				return fmt.Sprintf("Error while attaching the permission rbac to the rbac role: %s", err.Error())
+			}
 			err = authz.AttachPermission("rbac", "rbac")
 			if err != nil {
 				return fmt.Sprintf("Error while attaching the permission rbac to the rbac role: %s", err.Error())
 			}
-			err = authz.BindToRole("user", user.ID, "rbac")
+			err = authz.BindToRole("user", user.ID, "owner")
 			if err != nil {
-				return fmt.Sprintf("Error while creating the binding to rbac role: %s", err.Error())
+				return fmt.Sprintf("Error while creating the binding to owner role: %s", err.Error())
 			}
 			return "You are the boss now."
 		}
