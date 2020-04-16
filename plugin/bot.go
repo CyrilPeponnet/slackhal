@@ -79,7 +79,7 @@ func (s *Bot) ExtractFeaturesFromMessage(message string) (features []MessageFeat
 				ID:    ci.ID,
 			})
 			// User
-		case strings.HasPrefix(m[1], "#U") || strings.HasPrefix(m[1], "#W"):
+		case strings.HasPrefix(m[1], "@U") || strings.HasPrefix(m[1], "@W"):
 			u := strings.Split(m[1], "|")[0]
 			ui, err := s.GetCachedUserInfos(u[1:])
 			if err != nil {
@@ -107,11 +107,13 @@ func (s *Bot) ExtractFeaturesFromMessage(message string) (features []MessageFeat
 			// regular link
 		default:
 			l := strings.Split(m[1], "|")
-			features = append(features, MessageFeature{
-				Type:  TypeLink,
-				Value: l[1],
-				ID:    l[0],
-			})
+			if len(l) == 2 {
+				features = append(features, MessageFeature{
+					Type:  TypeLink,
+					Value: l[1],
+					ID:    l[0],
+				})
+			}
 		}
 	}
 
